@@ -76,11 +76,35 @@ function guessExt(contentType: string): string {
   return "";
 }
 
+/**
+ * Refuses uploads with a clear message. Used on Netlify (or any other
+ * serverless host) where the filesystem is ephemeral, so writing to disk
+ * would silently lose files on the next cold start.
+ */
+class EphemeralFsGuardProvider implements IStorageProvider {
+  async upload(): Promise<StoredFile> {
+    throw new Error(
+      "File uploads are disabled on this deployment because the runtime " +
+        "filesystem is ephemeral. Configure STORAGE_PROVIDER=s3 (or another " +
+        "durable provider) and re-deploy to enable uploads.",
+    );
+  }
+}
+
 let _provider: IStorageProvider | null = null;
 
 export function getStorage(): IStorageProvider {
   if (_provider) return _provider;
   const kind = process.env.STORAGE_PROVIDER ?? "local";
+  // On Netlify (or any serverless host that sets IS_NETLIFY/NETLIFY) the
+  // local filesystem is ephemeral — uploads would silently disappear on the
+  // next cold start. Refuse loudly unless an explicit durable provider is set.
+  const isEphemeralRuntime =
+    process.env.IS_NETLIFY === "true" || process.env.NETLIFY === "true";
+  if (kind === "local" && isEphemeralRuntime) {
+    _provider = new EphemeralFsGuardProvider();
+    return _provider;
+  }
   switch (kind) {
     case "local":
       _provider = new LocalStorageProvider(
