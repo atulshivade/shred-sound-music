@@ -16,15 +16,18 @@ const FALLBACK_BUILD_URL = "postgresql://invalid:invalid@127.0.0.1:1/invalid";
 /**
  * Picks a database backend based on env:
  *
- * - `DATABASE_URL=postgresql://…`  → real Postgres via `postgres-js` (production).
- * - missing / empty                → embedded **PGlite** persisted to `./.data/pgdata`
- *                                    (zero-install local dev — same SQL dialect).
- * - `DATABASE_URL=memory:`         → ephemeral in-memory PGlite (tests).
+ * - `DATABASE_URL=postgresql://…`           → real Postgres via `postgres-js`.
+ * - `NETLIFY_DATABASE_URL=postgresql://…`   → same, auto-injected by Netlify DB
+ *                                             (managed Neon Postgres) at runtime.
+ * - missing / empty                         → embedded **PGlite** persisted to
+ *                                             `./.data/pgdata` (zero-install
+ *                                             local dev — same SQL dialect).
+ * - `DATABASE_URL=memory:`                  → ephemeral in-memory PGlite (tests).
  *
  * Reused across HMR via `globalThis` to avoid pool exhaustion.
  */
 function buildDb() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL ?? process.env.NETLIFY_DATABASE_URL;
   const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 
   // Real Postgres path
