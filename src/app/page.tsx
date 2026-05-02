@@ -1,65 +1,149 @@
-import Image from "next/image";
+import Link from "next/link";
+import {
+  AudioLines,
+  Music2,
+  BadgeCheck,
+  Crown,
+  ArrowRight,
+  Headphones,
+  Zap,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { auth } from "@/lib/auth";
 
-export default function Home() {
+export default async function LandingPage() {
+  const session = await auth();
+  const ctaHref = session?.user
+    ? session.user.role === "ADMIN"
+      ? "/admin"
+      : "/challenges"
+    : "/sign-in";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="surface-gradient min-h-screen">
+      {/* Top bar */}
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/30">
+            <AudioLines className="h-5 w-5" />
+          </span>
+          <span className="text-lg tracking-tight">Encore</span>
+        </Link>
+        <nav className="flex items-center gap-2">
+          {session?.user ? (
+            <Button asChild>
+              <Link href={ctaHref}>
+                Open studio <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <>
+              <Button asChild variant="ghost">
+                <Link href="/sign-in">Sign in</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/sign-up">Get started</Link>
+              </Button>
+            </>
+          )}
+        </nav>
+      </header>
+
+      {/* Hero */}
+      <section className="relative mx-auto max-w-6xl px-6 pb-16 pt-12 text-center">
+        <Badge variant="accent" className="mb-5">
+          <Music2 className="mr-1 h-3 w-3" />
+          New season just dropped
+        </Badge>
+        <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+          Play it.{" "}
+          <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Post it. Get heard.
+          </span>
+        </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+          A music performance portal where teachers post challenges, students
+          upload their best takes, and the community discovers what&apos;s next.
+          Timestamped feedback. Verified badges. Best Performer crown.
+        </p>
+        <div className="mt-8 flex items-center justify-center gap-3">
+          <Button asChild size="lg">
+            <Link href={ctaHref}>
+              {session?.user ? "Continue" : "Join the stage"}
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/feed">Browse performances</Link>
+          </Button>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Decorative equalizer */}
+        <div className="mx-auto mt-10 flex h-16 max-w-md items-end justify-center gap-1.5">
+          {[0.4, 0.7, 1, 0.55, 0.85, 0.35, 0.95, 0.6, 0.45, 0.75, 1, 0.5].map((h, i) => (
+            <span
+              key={i}
+              className="eq-bar inline-block w-2 rounded-t bg-gradient-to-t from-primary to-accent"
+              style={{
+                height: `${h * 100}%`,
+                animationDelay: `${i * 80}ms`,
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          ))}
         </div>
-      </main>
+      </section>
+
+      {/* Features */}
+      <section className="mx-auto grid max-w-6xl gap-6 px-6 pb-24 sm:grid-cols-3">
+        <FeatureCard
+          icon={<Music2 className="h-5 w-5" />}
+          title="Tagged performances"
+          desc="Upload short videos, tag your instrument and skill level. Teachers and peers can filter to exactly what they want to hear."
+        />
+        <FeatureCard
+          icon={<BadgeCheck className="h-5 w-5" />}
+          title="Timestamped feedback"
+          desc="Teachers leave notes pinned to specific moments — rhythm, technique, musicality, scored 0–10."
+        />
+        <FeatureCard
+          icon={<Crown className="h-5 w-5" />}
+          title="Best Performer crown"
+          desc="Curated picks per challenge with audit trail, plus a public spotlight on the feed."
+        />
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border/40">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <Headphones className="h-4 w-4" />© {new Date().getFullYear()} Encore
+          </span>
+          <span className="flex items-center gap-1">
+            Built with <Zap className="h-3 w-3 text-accent" /> Next.js · Drizzle · shadcn/ui · Bunny.net
+          </span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function FeatureCard({
+  icon,
+  title,
+  desc,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card/60 p-6 shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/10">
+      <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 text-primary">
+        {icon}
+      </div>
+      <h3 className="text-lg font-semibold">{title}</h3>
+      <p className="mt-1.5 text-sm text-muted-foreground">{desc}</p>
     </div>
   );
 }

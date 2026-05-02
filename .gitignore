@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# user-uploaded files (keep folder via .gitkeep)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# drizzle
+/drizzle/meta/_journal.json.bak
+
+# local PGlite data directory
+/.data/
