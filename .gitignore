@@ -49,3 +49,6 @@ next-env.d.ts
 
 # local PGlite data directory
 /.data/
+
+# Local Netlify folder
+.netlify
