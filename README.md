@@ -6,6 +6,18 @@ discovers what's next via a feed with a Best Performer spotlight.
 
 > Built by **Digital COE Gen AI Team**.
 
+## Live demo
+
+- **URL:** https://djmusic-challenge.netlify.app
+- **Teacher login:** `admin@portal.dev` / `Password123`
+- **Student logins:** `alex@portal.dev` / `Password123`, `riya@portal.dev` / `Password123`
+
+> Hosted on Netlify with managed Netlify DB (Neon Postgres). The seed includes
+> 3 challenges, 2 sample performances and one **Best Performer** (Riya's
+> Chopin take). Note: file uploads are disabled on the live demo because
+> Netlify Functions have an ephemeral filesystem — configure
+> `STORAGE_PROVIDER=s3` to enable durable uploads.
+
 ---
 
 ## Highlights
