@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright configuration for Encore.
+ * Playwright configuration for D Clef Music.
  *
  * - Default `BASE_URL` points at the Netlify production deploy. Override with
  *   `BASE_URL=http://localhost:3000` to run against `npm run dev`.

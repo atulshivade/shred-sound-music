@@ -6,6 +6,7 @@ import {
   ClipboardList,
   LogOut,
 } from "lucide-react";
+import { InstagramGlyph } from "@/components/icons/instagram-glyph";
 import { auth, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,7 +34,7 @@ export async function Navbar() {
           <span className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/30">
             <AudioLines className="h-4 w-4" />
           </span>
-          <span className="hidden sm:inline">Encore</span>
+          <span className="hidden whitespace-nowrap sm:inline">D Clef Music</span>
         </Link>
 
         <nav className="ml-4 flex items-center gap-1">
@@ -51,6 +52,15 @@ export async function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <a
+            href="https://www.instagram.com/d_clef_music/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow D Clef Music on Instagram"
+            className="hidden rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent/10 hover:text-foreground sm:inline-flex"
+          >
+            <InstagramGlyph className="h-4 w-4" />
+          </a>
           {user ? (
             <>
               <Badge variant={isAdmin ? "accent" : "secondary"} className="hidden sm:inline-flex">

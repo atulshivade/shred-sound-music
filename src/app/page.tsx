@@ -8,6 +8,7 @@ import {
   Headphones,
   Zap,
 } from "lucide-react";
+import { InstagramGlyph } from "@/components/icons/instagram-glyph";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/lib/auth";
@@ -28,7 +29,7 @@ export default async function LandingPage() {
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/30">
             <AudioLines className="h-5 w-5" />
           </span>
-          <span className="text-lg tracking-tight">Encore</span>
+          <span className="text-lg tracking-tight">D Clef Music</span>
         </Link>
         <nav className="flex items-center gap-2">
           {session?.user ? (
@@ -115,10 +116,20 @@ export default async function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border/40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 text-sm text-muted-foreground">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-muted-foreground sm:flex-row">
           <span className="flex items-center gap-1.5">
-            <Headphones className="h-4 w-4" />© {new Date().getFullYear()} Encore
+            <Headphones className="h-4 w-4" />© {new Date().getFullYear()} D Clef Music
           </span>
+          <a
+            href="https://www.instagram.com/d_clef_music/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-foreground/80 transition-colors hover:bg-accent/10 hover:text-foreground"
+            aria-label="Follow D Clef Music on Instagram"
+          >
+            <InstagramGlyph className="h-4 w-4" />
+            @d_clef_music
+          </a>
           <span className="flex items-center gap-1">
             Built with <Zap className="h-3 w-3 text-accent" /> Next.js · Drizzle · shadcn/ui · Bunny.net
           </span>

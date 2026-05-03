@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Encore — Music Performance & Challenge Portal",
+  title: "D Clef Music — Performance & Challenge Portal",
   description:
-    "Where students post their performances, teachers leave timestamped feedback, and the community discovers what's next.",
+    "Where students post their performances, teachers leave timestamped feedback, and the D Clef Music community discovers what's next.",
 };
 
 export default function RootLayout({

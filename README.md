@@ -1,9 +1,11 @@
-# Encore — Music Performance & Challenge Portal
+# D Clef Music — Performance & Challenge Portal
 
 A dark-themed music platform where **teachers** post challenges, **students**
-upload performance videos tagged by instrument and skill, and the community
-discovers what's next via a feed with a Best Performer spotlight.
+upload performance videos tagged by instrument and skill, and the D Clef Music
+community discovers what's next via a feed with a Best Performer spotlight.
 
+> Follow on Instagram: [@d_clef_music](https://www.instagram.com/d_clef_music/)
+>
 > Built by **Digital COE Gen AI Team**.
 
 ## Live demo

@@ -76,7 +76,7 @@ export default function SignUpPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Join Encore</CardTitle>
+        <CardTitle>Join D Clef Music</CardTitle>
         <CardDescription>Create your student account and start posting performances.</CardDescription>
       </CardHeader>
       <CardContent>

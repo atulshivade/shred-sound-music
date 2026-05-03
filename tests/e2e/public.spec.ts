@@ -1,10 +1,13 @@
 import { test, expect, collectConsoleErrors } from "./fixtures";
 
 test.describe("Public pages (no auth)", () => {
-  test("/ landing renders Encore branding and hero CTA", async ({ page }) => {
+  test("/ landing renders D Clef Music branding and hero CTA", async ({ page }) => {
     const errors = collectConsoleErrors(page);
     await page.goto("/");
-    await expect(page).toHaveTitle(/Encore/i);
+    await expect(page).toHaveTitle(/D Clef Music/i);
+    // Brand wordmark in the header should read "D Clef Music".
+    await expect(page.getByText("D Clef Music", { exact: false }).first())
+      .toBeVisible();
     // Hero H1 reads "Play it. Post it. Get heard." across two coloured spans.
     await expect(
       page.getByRole("heading", { name: /play it.*post it.*get heard/i }).first(),
@@ -15,8 +18,30 @@ test.describe("Public pages (no auth)", () => {
     // The two main CTAs should be visible.
     await expect(page.getByRole("link", { name: /browse performances/i }))
       .toBeVisible();
+    // The Instagram link in the footer points at the brand handle.
+    const ig = page.getByRole("link", {
+      name: /follow d clef music on instagram/i,
+    });
+    await expect(ig).toBeVisible();
+    await expect(ig).toHaveAttribute(
+      "href",
+      "https://www.instagram.com/d_clef_music/",
+    );
+    await expect(ig).toHaveAttribute("target", "_blank");
+    await expect(ig).toHaveAttribute("rel", /noopener/);
     // No console errors during render.
     expect(errors().filter((e) => !e.includes("preload")).slice(0, 5)).toEqual([]);
+  });
+
+  test("no stale 'Encore' branding remains on key pages", async ({ page }) => {
+    for (const path of ["/", "/sign-in", "/sign-up"]) {
+      await page.goto(path);
+      const html = await page.content();
+      expect(
+        html.includes("Encore"),
+        `expected no "Encore" mentions on ${path}`,
+      ).toBe(false);
+    }
   });
 
   test("/sign-in shows email + password fields", async ({ page }) => {

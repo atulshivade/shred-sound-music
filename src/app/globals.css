@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ----------------------------------------------------------------
- * Encore — music platform palette
+ * D Clef Music — music platform palette
  *
  * Default theme is dark (set on <html> in layout.tsx). The light
  * fallback is kept for users with `prefers-color-scheme: light`

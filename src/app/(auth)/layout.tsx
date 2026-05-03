@@ -21,7 +21,7 @@ export default async function AuthLayout({
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/30">
             <AudioLines className="h-5 w-5" />
           </span>
-          Encore
+          D Clef Music
         </Link>
         {children}
       </div>
