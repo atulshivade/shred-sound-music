@@ -7,7 +7,7 @@ spotlight. Mobile-first banded layout that scales cleanly to laptop and tablet.
 
 > Follow on Instagram: [@shred_sound_music](https://www.instagram.com/shred_sound_music/)
 >
-> Built by **Digital COE Gen AI Team**.
+> Built by [logicboxlab.com](https://logicboxlab.com).
 
 ## Live demo
 

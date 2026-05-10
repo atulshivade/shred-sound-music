@@ -218,7 +218,17 @@ export default async function LandingPage() {
             <InstagramGlyph className="h-4 w-4" />
             @shred_sound_music
           </a>
-          <span className="hidden sm:inline">Built with Next.js · Drizzle · shadcn/ui</span>
+          <span>
+            Built by{" "}
+            <a
+              href="https://logicboxlab.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-foreground/80 underline-offset-4 hover:text-primary hover:underline"
+            >
+              logicboxlab.com
+            </a>
+          </span>
         </div>
       </footer>
     </div>

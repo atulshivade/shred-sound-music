@@ -46,19 +46,37 @@ test.describe("Public pages (no auth)", () => {
     expect(errors().filter((e) => !/preload|hydration/i.test(e))).toEqual([]);
   });
 
-  test("no stale 'Encore' or 'D Clef Music' branding remains on key pages", async ({
+  test("no stale brand or attribution strings remain on key pages", async ({
     page,
   }) => {
     for (const path of ["/", "/sign-in", "/sign-up"]) {
       await page.goto(path);
       const html = await page.content();
-      for (const stale of ["Encore", "D Clef Music", "d-clef-music", "d_clef_music"]) {
+      for (const stale of [
+        "Encore",
+        "D Clef Music",
+        "d-clef-music",
+        "d_clef_music",
+        "Digital COE Gen AI Team",
+        "Digital COE",
+      ]) {
         expect(
           html.includes(stale),
           `expected no "${stale}" mentions on ${path}`,
         ).toBe(false);
       }
     }
+  });
+
+  test("landing footer credits logicboxlab.com (not Digital COE)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const credit = page.getByRole("link", { name: /logicboxlab\.com/i });
+    await expect(credit).toBeVisible();
+    await expect(credit).toHaveAttribute("href", /logicboxlab\.com/);
+    await expect(credit).toHaveAttribute("target", "_blank");
+    await expect(credit).toHaveAttribute("rel", /noopener/);
   });
 
   test("/sign-in shows email + password fields and brand copy", async ({ page }) => {
