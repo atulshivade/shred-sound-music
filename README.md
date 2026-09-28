@@ -12,7 +12,6 @@ spotlight. Mobile-first banded layout that scales cleanly to laptop and tablet.
 ## Live demo
 
 - **Production:** https://shred-sound-music.logicboxlab.com
-- **Source:** https://github.com/atulshivade/shred-sound-music
 - **Local URL:** http://localhost:3000 (run `npm run dev`)
 - **Teacher login:** `admin@portal.dev` / `Password123`
 - **Student logins:** `alex@portal.dev` / `Password123`, `riya@portal.dev` / `Password123`
@@ -208,11 +207,16 @@ everywhere instead of redefining shapes.
   gallery + Best Performer highlight
 - `/feed` — filterable feed by instrument / skill, with Best Performer
   spotlight at the top
+- `/shorts` — mobile-first vertical approved-performance feed
+- `/learn` — homework, lesson, song and quiz foundation
+- `/profile` — XP and personal submission status
 
 ### Teacher (admin) only
 - `/admin` — studio dashboard
 - `/admin/challenges/new` — create challenge with instrument focus + skill target
 - `/admin/evaluate` — evaluation studio with per-card actions
+- `/admin/health` — Test Agent with one-click diagnostics, full-suite dispatch,
+  persisted case results and failure notices
 
 ### API
 - `POST /api/upload` — auth required, image/video, 25 MB cap, raw storage
@@ -449,6 +453,18 @@ The suite covers:
   matrix.
 
 Open the HTML report after a run with `npm run test:report`.
+
+### Admin Test Agent
+
+Teachers can open `/admin/health` and run production-safe smoke diagnostics.
+The **Run all test cases** button dispatches the complete Playwright suite to
+GitHub Actions; **Retest failures** reruns only failed titles.
+
+Configure the deployed app with `TEST_RUN_INGEST_SECRET`,
+`GITHUB_DISPATCH_ENABLED=true`, `GITHUB_API_TOKEN`, `GITHUB_REPO`, and
+`TEST_BASE_URL`. Add the same `TEST_RUN_INGEST_SECRET` as a GitHub Actions
+repository secret. Student-facing notices contain only safe service messages;
+technical traces remain restricted to teachers.
 
 ---
 

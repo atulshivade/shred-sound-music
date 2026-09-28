@@ -15,6 +15,13 @@
       "when": 1778433757435,
       "tag": "0001_add_cloudinary_video_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790584898730,
+      "tag": "0002_flashy_the_watchers",
+      "breakpoints": true
     }
   ]
 }

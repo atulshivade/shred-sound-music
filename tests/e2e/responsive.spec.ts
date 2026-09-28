@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, signIn, STUDENT_ALEX } from "./fixtures";
 
 /**
  * Layout regression tests at the three break points the design targets:
@@ -104,5 +104,25 @@ test.describe("Responsive landing page", () => {
     await expect(
       page.getByText("Shred Sound Music", { exact: false }).first(),
     ).toBeVisible();
+  });
+
+  test("signed-in students get the five-tab mobile app navigation", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await signIn(page, STUDENT_ALEX);
+    await page.goto("/feed");
+    const nav = page.getByRole("navigation", { name: /mobile primary/i });
+    await expect(nav).toBeVisible();
+    for (const label of ["Home", "Shorts", "Challenges", "Learn", "Profile"]) {
+      await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
+    const shortsLink = nav.getByRole("link", { name: "Shorts", exact: true });
+    await expect(shortsLink).toHaveAttribute("href", "/shorts");
+    // Next.js devtools' issue badge can overlap the bottom-left tabs in dev;
+    // direct navigation still validates the route without testing that overlay.
+    await page.goto("/shorts");
+    await expect(page).toHaveURL(/\/shorts$/);
+    await expect(page.getByRole("heading", { name: /shred shorts/i })).toBeVisible();
   });
 });

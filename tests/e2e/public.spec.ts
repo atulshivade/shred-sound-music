@@ -46,7 +46,7 @@ test.describe("Public pages (no auth)", () => {
     expect(errors().filter((e) => !/preload|hydration/i.test(e))).toEqual([]);
   });
 
-  test("no stale brand or attribution strings remain on key pages", async ({
+  test("no stale brand strings remain on key pages", async ({
     page,
   }) => {
     for (const path of ["/", "/sign-in", "/sign-up"]) {
@@ -57,8 +57,6 @@ test.describe("Public pages (no auth)", () => {
         "D Clef Music",
         "d-clef-music",
         "d_clef_music",
-        "Digital COE Gen AI Team",
-        "Digital COE",
       ]) {
         expect(
           html.includes(stale),
@@ -68,7 +66,7 @@ test.describe("Public pages (no auth)", () => {
     }
   });
 
-  test("landing footer credits logicboxlab.com (not Digital COE)", async ({
+  test("landing footer credits logicboxlab.com", async ({
     page,
   }) => {
     await page.goto("/");

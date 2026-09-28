@@ -241,6 +241,21 @@ test.describe("API health", () => {
   });
 });
 
+test.describe("Test Agent API security", () => {
+  test("result ingestion rejects requests without the machine secret", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/internal/test-runs/ingest", {
+      data: {
+        runId: "00000000-0000-0000-0000-000000000000",
+        status: "PASSED",
+        cases: [],
+      },
+    });
+    expect(response.status()).toBe(401);
+  });
+});
+
 /**
  * Pure-function regression tests for the Cloudinary signing helper.
  *
@@ -801,5 +816,15 @@ test.describe("SCHEMA_STATEMENTS idempotency invariants", () => {
       "no ALTER TYPE … ADD VALUE IF NOT EXISTS 'CLOUDINARY' — legacy DBs will not self-heal",
     ).toBeTruthy();
     expect(top!).toMatch(/ADD VALUE IF NOT EXISTS/);
+  });
+
+  test("student performances default to pending teacher approval", () => {
+    const performanceTable = SCHEMA_STATEMENTS.find((statement) =>
+      statement.includes(`CREATE TABLE IF NOT EXISTS "performance"`),
+    );
+    expect(performanceTable).toBeTruthy();
+    expect(performanceTable!).toMatch(
+      /"status"\s+"performance_status"\s+DEFAULT 'PENDING'/,
+    );
   });
 });

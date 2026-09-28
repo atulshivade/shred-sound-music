@@ -43,6 +43,18 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   `DO $$ BEGIN
      CREATE TYPE "public"."video_provider" AS ENUM('LOCAL','BUNNY','VIMEO','CLOUDINARY','EMBED');
    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     CREATE TYPE "public"."test_run_kind" AS ENUM('SMOKE','FULL_E2E','RETEST');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     CREATE TYPE "public"."test_run_status" AS ENUM('QUEUED','RUNNING','PASSED','FAILED','TIMED_OUT');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     CREATE TYPE "public"."test_case_status" AS ENUM('PENDING','RUNNING','PASSED','FAILED','SKIPPED');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     CREATE TYPE "public"."service_notice_audience" AS ENUM('ALL','STUDENT','ADMIN');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   // For DBs initialised before CLOUDINARY was added, top up the enum.
   // ADD VALUE IF NOT EXISTS is idempotent (Postgres 12+, PGlite 16).
   `ALTER TYPE "public"."video_provider" ADD VALUE IF NOT EXISTS 'CLOUDINARY' BEFORE 'EMBED'`,
@@ -114,12 +126,17 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
      "video_external_id" text,
      "video_duration_seconds" integer,
      "thumbnail_url" text,
-     "status" "performance_status" DEFAULT 'PUBLISHED' NOT NULL,
+     "status" "performance_status" DEFAULT 'PENDING' NOT NULL,
      "is_verified" boolean DEFAULT false NOT NULL,
      "is_best_performer" boolean DEFAULT false NOT NULL,
      "likes_count" integer DEFAULT 0 NOT NULL,
      "submitted_at" timestamp DEFAULT now() NOT NULL
    )`,
+  // Existing databases keep their rows unchanged; only future submissions
+  // inherit the approval-first default.
+  `DO $$ BEGIN
+     ALTER TABLE "performance" ALTER COLUMN "status" SET DEFAULT 'PENDING';
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   `CREATE TABLE IF NOT EXISTS "feedback" (
      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
      "performance_id" uuid NOT NULL,
@@ -146,6 +163,45 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
      "reason" text,
      "period" text DEFAULT 'CHALLENGE' NOT NULL,
      "selected_at" timestamp DEFAULT now() NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS "test_run" (
+     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+     "kind" "test_run_kind" NOT NULL,
+     "status" "test_run_status" DEFAULT 'QUEUED' NOT NULL,
+     "triggered_by_id" uuid NOT NULL,
+     "parent_run_id" uuid,
+     "base_url" text NOT NULL,
+     "github_run_url" text,
+     "passed_count" integer DEFAULT 0 NOT NULL,
+     "failed_count" integer DEFAULT 0 NOT NULL,
+     "skipped_count" integer DEFAULT 0 NOT NULL,
+     "error_message" text,
+     "started_at" timestamp,
+     "finished_at" timestamp,
+     "created_at" timestamp DEFAULT now() NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS "test_case_result" (
+     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+     "run_id" uuid NOT NULL,
+     "slug" text NOT NULL,
+     "title" text NOT NULL,
+     "status" "test_case_status" DEFAULT 'PENDING' NOT NULL,
+     "project_name" text,
+     "duration_ms" integer,
+     "public_summary" text,
+     "admin_detail" text,
+     "finished_at" timestamp
+   )`,
+  `CREATE TABLE IF NOT EXISTS "service_notice" (
+     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+     "run_id" uuid,
+     "audience" "service_notice_audience" DEFAULT 'ALL' NOT NULL,
+     "public_message" text NOT NULL,
+     "admin_detail" text,
+     "is_active" boolean DEFAULT true NOT NULL,
+     "created_by_id" uuid NOT NULL,
+     "created_at" timestamp DEFAULT now() NOT NULL,
+     "ends_at" timestamp
    )`,
 
   // Foreign keys (idempotent — wrap each in DO with EXCEPTION on duplicate_object)
@@ -185,6 +241,18 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   `DO $$ BEGIN
      ALTER TABLE "top_performer" ADD CONSTRAINT "top_performer_selected_by_id_user_id_fk" FOREIGN KEY ("selected_by_id") REFERENCES "public"."user"("id") ON DELETE restrict;
    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     ALTER TABLE "test_run" ADD CONSTRAINT "test_run_triggered_by_id_user_id_fk" FOREIGN KEY ("triggered_by_id") REFERENCES "public"."user"("id") ON DELETE restrict;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     ALTER TABLE "test_case_result" ADD CONSTRAINT "test_case_result_run_id_test_run_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."test_run"("id") ON DELETE cascade;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     ALTER TABLE "service_notice" ADD CONSTRAINT "service_notice_run_id_test_run_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."test_run"("id") ON DELETE set null;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     ALTER TABLE "service_notice" ADD CONSTRAINT "service_notice_created_by_id_user_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "public"."user"("id") ON DELETE restrict;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
 
   // Indexes
   `CREATE UNIQUE INDEX IF NOT EXISTS "user_email_unique" ON "user" USING btree ("email")`,
@@ -195,11 +263,17 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS "performance_student_idx" ON "performance" USING btree ("student_id")`,
   `CREATE INDEX IF NOT EXISTS "performance_instrument_idx" ON "performance" USING btree ("instrument")`,
   `CREATE INDEX IF NOT EXISTS "performance_skill_idx" ON "performance" USING btree ("skill_level")`,
+  `CREATE INDEX IF NOT EXISTS "performance_status_idx" ON "performance" USING btree ("status")`,
   `CREATE INDEX IF NOT EXISTS "performance_best_idx" ON "performance" USING btree ("is_best_performer")`,
   `CREATE INDEX IF NOT EXISTS "feedback_performance_idx" ON "feedback" USING btree ("performance_id")`,
   `CREATE INDEX IF NOT EXISTS "feedback_teacher_idx" ON "feedback" USING btree ("teacher_id")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "top_performer_performance_unique" ON "top_performer" USING btree ("performance_id")`,
   `CREATE INDEX IF NOT EXISTS "top_performer_challenge_idx" ON "top_performer" USING btree ("challenge_id")`,
+  `CREATE INDEX IF NOT EXISTS "test_run_status_created_idx" ON "test_run" USING btree ("status","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "test_run_triggered_by_idx" ON "test_run" USING btree ("triggered_by_id")`,
+  `CREATE INDEX IF NOT EXISTS "test_case_result_run_idx" ON "test_case_result" USING btree ("run_id")`,
+  `CREATE INDEX IF NOT EXISTS "test_case_result_status_idx" ON "test_case_result" USING btree ("status")`,
+  `CREATE INDEX IF NOT EXISTS "service_notice_active_idx" ON "service_notice" USING btree ("is_active","audience")`,
 ];
 
 /** Minimal shape required for execution — keeps this module free of a hard

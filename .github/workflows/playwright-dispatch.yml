@@ -1,0 +1,56 @@
+name: Admin Playwright Test Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Persisted Test Agent run ID
+        required: true
+      base_url:
+        description: Deployment URL to test
+        required: true
+      ingest_url:
+        description: Test result ingestion endpoint
+        required: true
+      grep:
+        description: Optional Playwright title filter for retesting failures
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - name: Run all Playwright cases
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          TEST_RUN_ID: ${{ inputs.run_id }}
+          TEST_INGEST_URL: ${{ inputs.ingest_url }}
+          TEST_RUN_INGEST_SECRET: ${{ secrets.TEST_RUN_INGEST_SECRET }}
+          TEST_GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RETEST_GREP: ${{ inputs.grep }}
+        run: |
+          if [ -n "$RETEST_GREP" ]; then
+            npx playwright test --grep "$RETEST_GREP" --reporter=line,html,./tests/reporters/ingest-reporter.ts
+          else
+            npx playwright test --reporter=line,html,./tests/reporters/ingest-reporter.ts
+          fi
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ inputs.run_id }}
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14

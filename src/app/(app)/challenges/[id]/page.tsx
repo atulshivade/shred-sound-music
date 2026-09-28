@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, or } from "drizzle-orm";
 import { Calendar, Trophy, Music2, Crown, Upload } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -48,12 +48,22 @@ export default async function ChallengeDetailPage({
 
   if (!challenge) notFound();
 
-  const where = filterInstrument
-    ? and(
+  const isAdmin = session?.user?.role === "ADMIN";
+  const viewerId = session?.user?.id;
+  const visibility = isAdmin
+    ? eq(performances.challengeId, id)
+    : and(
         eq(performances.challengeId, id),
-        eq(performances.instrument, filterInstrument),
-      )
-    : eq(performances.challengeId, id);
+        viewerId
+          ? or(
+              eq(performances.status, "PUBLISHED"),
+              eq(performances.studentId, viewerId),
+            )
+          : eq(performances.status, "PUBLISHED"),
+      );
+  const where = filterInstrument
+    ? and(visibility, eq(performances.instrument, filterInstrument))
+    : visibility;
 
   const subs = await db
     .select({
@@ -72,15 +82,13 @@ export default async function ChallengeDetailPage({
         await db
           .select({ instrument: performances.instrument })
           .from(performances)
-          .where(eq(performances.challengeId, id))
+          .where(visibility)
       ).map((r) => r.instrument),
     ),
   ) as Instrument[];
 
   const deadlineLabel = formatRelativeDeadline(challenge.deadline);
   const closed = deadlineLabel === "Closed" || challenge.status !== "ACTIVE";
-  const isAdmin = session?.user?.role === "ADMIN";
-  const viewerId = session?.user?.id;
   const myOwn = viewerId
     ? subs.filter((s) => s.performance.studentId === viewerId)
     : [];

@@ -372,7 +372,7 @@ export function PerformanceUploader({
         toast.error(res.error);
         return;
       }
-      toast.success("Performance posted to the gallery");
+      toast.success("Performance submitted for teacher approval");
       reset();
       router.refresh();
     });

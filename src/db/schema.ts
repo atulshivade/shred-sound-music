@@ -65,6 +65,34 @@ export const performanceStatusEnum = pgEnum("performance_status", [
   "REJECTED",
 ]);
 
+export const testRunKindEnum = pgEnum("test_run_kind", [
+  "SMOKE",
+  "FULL_E2E",
+  "RETEST",
+]);
+
+export const testRunStatusEnum = pgEnum("test_run_status", [
+  "QUEUED",
+  "RUNNING",
+  "PASSED",
+  "FAILED",
+  "TIMED_OUT",
+]);
+
+export const testCaseStatusEnum = pgEnum("test_case_status", [
+  "PENDING",
+  "RUNNING",
+  "PASSED",
+  "FAILED",
+  "SKIPPED",
+]);
+
+export const serviceNoticeAudienceEnum = pgEnum("service_notice_audience", [
+  "ALL",
+  "STUDENT",
+  "ADMIN",
+]);
+
 /* ------------------------------------------------------------------ */
 /* Auth.js core tables                                                */
 /* (Required by @auth/drizzle-adapter — names matched to its defaults) */
@@ -202,7 +230,7 @@ export const performances = pgTable(
     thumbnailUrl: text("thumbnail_url"),
 
     // Moderation + curation
-    status: performanceStatusEnum("status").notNull().default("PUBLISHED"),
+    status: performanceStatusEnum("status").notNull().default("PENDING"),
     isVerified: boolean("is_verified").notNull().default(false), // teacher's quality stamp
     isBestPerformer: boolean("is_best_performer").notNull().default(false),
 
@@ -216,6 +244,7 @@ export const performances = pgTable(
     index("performance_student_idx").on(t.studentId),
     index("performance_instrument_idx").on(t.instrument),
     index("performance_skill_idx").on(t.skillLevel),
+    index("performance_status_idx").on(t.status),
     index("performance_best_idx").on(t.isBestPerformer),
   ],
 );
@@ -295,6 +324,82 @@ export const performanceLikes = pgTable(
       .default(sql`now()`),
   },
   (t) => [primaryKey({ columns: [t.performanceId, t.userId] })],
+);
+
+/**
+ * Persisted executions from the admin Test Agent. SMOKE runs execute safe
+ * in-process diagnostics; FULL_E2E/RETEST runs are delegated to CI.
+ */
+export const testRuns = pgTable(
+  "test_run",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    kind: testRunKindEnum("kind").notNull(),
+    status: testRunStatusEnum("status").notNull().default("QUEUED"),
+    triggeredById: uuid("triggered_by_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    parentRunId: uuid("parent_run_id"),
+    baseUrl: text("base_url").notNull(),
+    githubRunUrl: text("github_run_url"),
+    passedCount: integer("passed_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { mode: "date" }),
+    finishedAt: timestamp("finished_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("test_run_status_created_idx").on(t.status, t.createdAt),
+    index("test_run_triggered_by_idx").on(t.triggeredById),
+  ],
+);
+
+export const testCaseResults = pgTable(
+  "test_case_result",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => testRuns.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    status: testCaseStatusEnum("status").notNull().default("PENDING"),
+    projectName: text("project_name"),
+    durationMs: integer("duration_ms"),
+    publicSummary: text("public_summary"),
+    adminDetail: text("admin_detail"),
+    finishedAt: timestamp("finished_at", { mode: "date" }),
+  },
+  (t) => [
+    index("test_case_result_run_idx").on(t.runId),
+    index("test_case_result_status_idx").on(t.status),
+  ],
+);
+
+export const serviceNotices = pgTable(
+  "service_notice",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").references(() => testRuns.id, {
+      onDelete: "set null",
+    }),
+    audience: serviceNoticeAudienceEnum("audience").notNull().default("ALL"),
+    publicMessage: text("public_message").notNull(),
+    adminDetail: text("admin_detail"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdById: uuid("created_by_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { mode: "date" })
+      .notNull()
+      .default(sql`now()`),
+    endsAt: timestamp("ends_at", { mode: "date" }),
+  },
+  (t) => [index("service_notice_active_idx").on(t.isActive, t.audience)],
 );
 
 /* ------------------------------------------------------------------ */
@@ -386,6 +491,8 @@ export type NewPerformance = typeof performances.$inferInsert;
 export type Feedback = typeof feedback.$inferSelect;
 export type NewFeedback = typeof feedback.$inferInsert;
 export type TopPerformer = typeof topPerformers.$inferSelect;
+export type TestRun = typeof testRuns.$inferSelect;
+export type TestCaseResult = typeof testCaseResults.$inferSelect;
 
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type ChallengeStatus = (typeof challengeStatusEnum.enumValues)[number];

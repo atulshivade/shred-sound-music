@@ -28,6 +28,25 @@ test.describe("Teacher (admin) flows", () => {
       .toBeVisible();
   });
 
+  test("Test Agent exposes one-click diagnostics and full-suite controls", async ({
+    page,
+  }) => {
+    await signIn(page, TEACHER);
+    await page.goto("/admin/health");
+    await expect(page.getByRole("heading", { name: /test agent/i })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /run safety checks/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /run all test cases/i }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /run safety checks/i }).click();
+    await expect(page.getByText(/5 passed, 0 failed/i)).toBeVisible({
+      timeout: 45_000,
+    });
+    await expect(page.getByText("Database connectivity")).toBeVisible();
+  });
+
   test.describe("Create challenge form", () => {
     test("date-time picker has a visible trigger (not a hidden icon-only one)", async ({
       page,

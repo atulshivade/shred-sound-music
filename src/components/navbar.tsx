@@ -5,6 +5,10 @@ import {
   Music2,
   ClipboardList,
   LogOut,
+  CircleUserRound,
+  BookOpen,
+  PlaySquare,
+  HeartPulse,
 } from "lucide-react";
 import { InstagramGlyph } from "@/components/icons/instagram-glyph";
 import { auth, signOut } from "@/lib/auth";
@@ -44,19 +48,30 @@ export async function Navbar() {
         </Link>
 
         <nav
-          className="ml-1 flex items-center gap-1 sm:ml-4"
+          className="ml-1 hidden items-center gap-1 md:flex md:ml-4"
           aria-label="Primary"
         >
+          <NavLink href="/feed" icon={<Music2 className="h-4 w-4" />}>
+            Home
+          </NavLink>
+          <NavLink href="/shorts" icon={<PlaySquare className="h-4 w-4" />}>
+            Shorts
+          </NavLink>
           <NavLink href="/challenges" icon={<ClipboardList className="h-4 w-4" />}>
             Challenges
           </NavLink>
-          <NavLink href="/feed" icon={<Music2 className="h-4 w-4" />}>
-            Feed
+          <NavLink href="/learn" icon={<BookOpen className="h-4 w-4" />}>
+            Learn
           </NavLink>
           {isAdmin && (
-            <NavLink href="/admin" icon={<LayoutDashboard className="h-4 w-4" />}>
-              Studio
-            </NavLink>
+            <>
+              <NavLink href="/admin" icon={<LayoutDashboard className="h-4 w-4" />}>
+                Studio
+              </NavLink>
+              <NavLink href="/admin/health" icon={<HeartPulse className="h-4 w-4" />}>
+                Test Agent
+              </NavLink>
+            </>
           )}
         </nav>
 
@@ -98,6 +113,12 @@ export async function Navbar() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">
+                      <CircleUserRound className="h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
                   <form
                     action={async () => {
                       "use server";

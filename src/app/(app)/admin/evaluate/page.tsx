@@ -84,7 +84,7 @@ export default async function EvaluatePage() {
         </p>
       </header>
 
-      <Tabs defaultValue="published">
+      <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending">
             Pending <Badge variant="secondary" className="ml-2">{byStatus.pending.length}</Badge>

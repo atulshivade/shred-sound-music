@@ -57,11 +57,18 @@ export async function togglePerformanceLikeAction(
     // Confirm the performance exists before mutating the like table — also
     // gives us the challenge id we need for revalidation later.
     const [perf] = await db
-      .select({ id: performances.id, challengeId: performances.challengeId })
+      .select({
+        id: performances.id,
+        challengeId: performances.challengeId,
+        status: performances.status,
+      })
       .from(performances)
       .where(eq(performances.id, performanceId))
       .limit(1);
     if (!perf) return { ok: false, error: "Performance not found" };
+    if (perf.status !== "PUBLISHED") {
+      return { ok: false, error: "Only published performances can be liked" };
+    }
 
     const [existing] = await db
       .select()
@@ -158,7 +165,9 @@ export async function createPerformanceAction(
       videoExternalId: parsed.data.videoExternalId || null,
       videoDurationSeconds: parsed.data.videoDurationSeconds ?? null,
       thumbnailUrl: parsed.data.thumbnailUrl || null,
-      status: "PUBLISHED",
+      // Child-safety baseline: every student upload must be reviewed by a
+      // teacher before it can appear in community feeds or galleries.
+      status: "PENDING",
     });
 
     revalidatePath(`/challenges/${parsed.data.challengeId}`);
@@ -231,6 +240,12 @@ export async function togglePerformanceFlagAction(
       parsed.data.isBestPerformer !== undefined
         ? parsed.data.isBestPerformer
         : current.isBestPerformer;
+    if (nextBest && current.status !== "PUBLISHED") {
+      return {
+        ok: false,
+        error: "Publish the performance before selecting it as Best Performer",
+      };
+    }
 
     await db
       .update(performances)
