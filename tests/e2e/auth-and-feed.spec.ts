@@ -49,6 +49,9 @@ test.describe("Authenticated student flows", () => {
     const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
 
     const r = await request.post("/api/upload/video", {
+      // First hit of this route on a cold Turbopack dev server pays the
+      // compile cost before the handler ever runs.
+      timeout: 60_000,
       headers: { cookie: cookieHeader },
       multipart: {
         file: {

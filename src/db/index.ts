@@ -72,7 +72,19 @@ function buildDb(): ReturnType<typeof drizzlePostgres> {
   // Real Postgres path — preferred whenever a URL is set.
   if (url && url.startsWith("postgres")) {
     globalThis.__dbKind = "postgres";
-    const client = postgres(url, { max: 10, prepare: false });
+    const client = postgres(url, {
+      // A serverless instance handles a handful of concurrent requests at
+      // most, and every extra socket is another TLS handshake against the
+      // pooler. Keeping the pool small means the connection opened by the
+      // first request is the one every later request reuses.
+      max: Number(process.env.DATABASE_POOL_MAX ?? 3),
+      // Never let the pool drop a warm connection while the instance is
+      // still alive — reconnecting costs a full handshake round trip.
+      idle_timeout: 0,
+      connect_timeout: 10,
+      // Required for transaction-mode poolers (Neon/Supabase pgbouncer).
+      prepare: false,
+    });
     return drizzlePostgres(client, { schema });
   }
 

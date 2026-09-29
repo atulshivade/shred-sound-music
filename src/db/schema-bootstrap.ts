@@ -274,6 +274,13 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS "test_case_result_run_idx" ON "test_case_result" USING btree ("run_id")`,
   `CREATE INDEX IF NOT EXISTS "test_case_result_status_idx" ON "test_case_result" USING btree ("status")`,
   `CREATE INDEX IF NOT EXISTS "service_notice_active_idx" ON "service_notice" USING btree ("is_active","audience")`,
+
+  // Bookkeeping table for the cold-start fast path. See `applySchemaBootstrap`.
+  `CREATE TABLE IF NOT EXISTS "schema_state" (
+     "key" text PRIMARY KEY NOT NULL,
+     "value" text NOT NULL,
+     "applied_at" timestamp DEFAULT now() NOT NULL
+   )`,
 ];
 
 /** Minimal shape required for execution — keeps this module free of a hard
@@ -283,6 +290,27 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExecCapable = { execute: (query: any) => any };
 
+const FINGERPRINT_KEY = "schema_fingerprint";
+
+/**
+ * Stable fingerprint of `SCHEMA_STATEMENTS`. Changing, adding or removing any
+ * statement changes the digest, which is what makes the cold-start fast path
+ * safe: a deploy that alters the schema will not match the value stored in
+ * the database and therefore re-applies the full statement list.
+ *
+ * FNV-1a over the joined statements — we need a cheap, dependency-free,
+ * deterministic digest, not a cryptographic one.
+ */
+export const SCHEMA_FINGERPRINT: string = (() => {
+  const source = SCHEMA_STATEMENTS.join("\u0000");
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < source.length; i += 1) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${SCHEMA_STATEMENTS.length}-${hash.toString(16).padStart(8, "0")}`;
+})();
+
 /**
  * Applies every statement in `SCHEMA_STATEMENTS` to the given DB handle.
  *
@@ -290,11 +318,54 @@ type ExecCapable = { execute: (query: any) => any };
  * error so the caller can decide how to surface it (the dbinit route
  * returns 500 + JSON; the instrumentation hook logs + suppresses).
  */
-export async function applySchemaBootstrap(
-  db: ExecCapable,
-): Promise<number> {
+export async function applySchemaBootstrap(db: ExecCapable): Promise<number> {
   for (const stmt of SCHEMA_STATEMENTS) {
     await db.execute(sql.raw(stmt));
   }
+  await db.execute(
+    sql`INSERT INTO "schema_state" ("key", "value", "applied_at")
+        VALUES (${FINGERPRINT_KEY}, ${SCHEMA_FINGERPRINT}, now())
+        ON CONFLICT ("key") DO UPDATE
+          SET "value" = EXCLUDED."value", "applied_at" = EXCLUDED."applied_at"`,
+  );
   return SCHEMA_STATEMENTS.length;
+}
+
+/**
+ * Cold-start entry point. Applying the full statement list costs one network
+ * round trip *per statement*, which on a managed Postgres adds seconds to
+ * every cold start even though the work is almost always a no-op. So we first
+ * ask the database, in a single round trip, whether it already carries this
+ * exact schema fingerprint and skip the rest when it does.
+ *
+ * The lookup deliberately tolerates any error — a missing `schema_state`
+ * table (fresh database, or one bootstrapped before this table existed) just
+ * means "not applied yet", which is the correct and safe conclusion.
+ */
+export async function ensureSchemaBootstrap(
+  db: ExecCapable,
+): Promise<{ applied: boolean; statements: number }> {
+  try {
+    const rows = await db.execute(
+      sql`SELECT "value" FROM "schema_state" WHERE "key" = ${FINGERPRINT_KEY}`,
+    );
+    const value = readFingerprint(rows);
+    if (value === SCHEMA_FINGERPRINT) return { applied: false, statements: 0 };
+  } catch {
+    // Fall through to the full bootstrap.
+  }
+  const statements = await applySchemaBootstrap(db);
+  return { applied: true, statements };
+}
+
+/**
+ * Normalises the result shape across drivers: `postgres-js` resolves to a
+ * row array, `pglite` resolves to `{ rows: [...] }`.
+ */
+function readFingerprint(result: unknown): string | undefined {
+  const rows = Array.isArray(result)
+    ? result
+    : (result as { rows?: unknown[] } | null)?.rows;
+  const first = rows?.[0] as { value?: unknown } | undefined;
+  return typeof first?.value === "string" ? first.value : undefined;
 }

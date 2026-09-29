@@ -1,9 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { serviceNotices, testCaseResults, testRuns } from "@/db/schema";
+import { CACHE_TAGS } from "@/lib/queries";
 
 export const runtime = "nodejs";
 
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
       adminDetail: `${failedCount} browser test(s) failed`,
       endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
+    revalidateTag(CACHE_TAGS.serviceNotices, "max");
   }
   return NextResponse.json({ ok: true });
 }

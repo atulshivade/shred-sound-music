@@ -57,6 +57,13 @@ next-env.d.ts
 /playwright-report/
 /test-results/
 /blob-report/
+
+# Scratch output from local build/test runs
+/.*.log
+
+# Product brief and other source documents stay out of the repo
+*.docx
+~$*
 /playwright/.cache/
 
 # Design references (not committed)

@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Activity, CheckCircle2, CircleX, Clock3 } from "lucide-react";
 import { db } from "@/db";
 import { testCaseResults, testRuns } from "@/db/schema";

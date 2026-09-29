@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { count, eq, desc } from "drizzle-orm";
+import { count, eq, desc, sql } from "drizzle-orm";
 import {
   PlusCircle,
   ClipboardList,
@@ -28,31 +28,39 @@ import { formatDate, formatInstrument } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  // The six headline counters used to be six separate queries. Filtered
+  // aggregates fold them into one round trip per table, which on a managed
+  // Postgres is most of this page's response time.
   const [
-    [{ totalChallenges }],
-    [{ activeChallenges }],
-    [{ totalPerformances }],
-    [{ verifiedPerformances }],
-    [{ bestPerformers }],
-    [{ totalStudents }],
+    [challengeStats],
+    [performanceStats],
+    [studentStats],
     recentChallenges,
     recentSubmissions,
   ] = await Promise.all([
-    db.select({ totalChallenges: count() }).from(challenges),
     db
-      .select({ activeChallenges: count() })
-      .from(challenges)
-      .where(eq(challenges.status, "ACTIVE")),
-    db.select({ totalPerformances: count() }).from(performances),
+      .select({
+        total: count(),
+        active: sql<number>`count(*) FILTER (WHERE ${challenges.status} = 'ACTIVE')`.mapWith(
+          Number,
+        ),
+      })
+      .from(challenges),
     db
-      .select({ verifiedPerformances: count() })
-      .from(performances)
-      .where(eq(performances.isVerified, true)),
+      .select({
+        total: count(),
+        verified: sql<number>`count(*) FILTER (WHERE ${performances.isVerified})`.mapWith(
+          Number,
+        ),
+        best: sql<number>`count(*) FILTER (WHERE ${performances.isBestPerformer})`.mapWith(
+          Number,
+        ),
+      })
+      .from(performances),
     db
-      .select({ bestPerformers: count() })
-      .from(performances)
-      .where(eq(performances.isBestPerformer, true)),
-    db.select({ totalStudents: count() }).from(users).where(eq(users.role, "STUDENT")),
+      .select({ total: count() })
+      .from(users)
+      .where(eq(users.role, "STUDENT")),
     db.select().from(challenges).orderBy(desc(challenges.createdAt)).limit(5),
     // Recent student submissions — joined with student + challenge so the
     // dashboard surfaces uploaded videos directly (instead of forcing the
@@ -106,25 +114,25 @@ export default async function AdminDashboardPage() {
         <StatCard
           icon={<ClipboardList className="h-5 w-5" />}
           label="Total challenges"
-          value={totalChallenges}
-          hint={`${activeChallenges} active`}
+          value={challengeStats?.total ?? 0}
+          hint={`${challengeStats?.active ?? 0} active`}
         />
         <StatCard
           icon={<Music2 className="h-5 w-5" />}
           label="Performances"
-          value={totalPerformances}
-          hint={`${verifiedPerformances} verified`}
+          value={performanceStats?.total ?? 0}
+          hint={`${performanceStats?.verified ?? 0} verified`}
         />
         <StatCard
           icon={<Users className="h-5 w-5" />}
           label="Students"
-          value={totalStudents}
+          value={studentStats?.total ?? 0}
           hint="Active musicians"
         />
         <StatCard
           icon={<Crown className="h-5 w-5" />}
           label="Best Performers"
-          value={bestPerformers}
+          value={performanceStats?.best ?? 0}
           hint="Crowned this season"
         />
       </section>

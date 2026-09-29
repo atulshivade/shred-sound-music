@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { db } from "@/db";
 import { challenges } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/queries";
 import { createChallengeSchema } from "@/lib/validators";
 
 export type CreateChallengeResult =
@@ -55,6 +56,7 @@ export async function createChallengeAction(
     };
   }
 
+  revalidateTag(CACHE_TAGS.challenges, "max");
   revalidatePath("/admin");
   revalidatePath("/challenges");
   redirect("/admin");

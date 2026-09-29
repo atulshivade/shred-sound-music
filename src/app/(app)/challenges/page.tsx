@@ -1,18 +1,12 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { challenges } from "@/db/schema";
 import { ChallengeCard } from "@/components/challenge-card";
+import { getActiveChallenges } from "@/lib/queries";
 import { Trophy, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChallengesPage() {
-  const active = await db
-    .select()
-    .from(challenges)
-    .where(eq(challenges.status, "ACTIVE"))
-    .orderBy(desc(challenges.createdAt));
+  const active = await getActiveChallenges();
 
   return (
     <>

@@ -1,23 +1,11 @@
-import { desc, eq } from "drizzle-orm";
 import { PlaySquare } from "lucide-react";
-import { db } from "@/db";
-import { challenges, performances, users } from "@/db/schema";
 import { PerformanceCard } from "@/components/performance-card";
+import { getPublishedPerformances } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShortsPage() {
-  const clips = await db
-    .select({
-      performance: performances,
-      student: { id: users.id, name: users.name, image: users.image },
-      challenge: { id: challenges.id, title: challenges.title },
-    })
-    .from(performances)
-    .innerJoin(users, eq(performances.studentId, users.id))
-    .innerJoin(challenges, eq(performances.challengeId, challenges.id))
-    .where(eq(performances.status, "PUBLISHED"))
-    .orderBy(desc(performances.submittedAt));
+  const clips = await getPublishedPerformances();
 
   return (
     <section className="bg-ink text-ink-foreground">
@@ -30,11 +18,14 @@ export default async function ShortsPage() {
           Approved student performances will appear here.
         </div>
       ) : (
-        <div className="mx-auto h-[calc(100dvh-7.5rem)] max-w-lg snap-y snap-mandatory overflow-y-auto px-3 pb-3 md:h-[calc(100dvh-3.5rem)]">
+        // Full-height snapping is the point of Shorts on a phone, but on a
+        // desktop viewport it strands one narrow card in a tall empty column.
+        // From `md` up the same cards lay out as an ordinary gallery.
+        <div className="mx-auto h-[calc(100dvh-7.5rem)] max-w-lg snap-y snap-mandatory overflow-y-auto px-3 pb-3 md:grid md:h-auto md:max-w-6xl md:grid-cols-2 md:snap-none md:gap-5 md:overflow-visible md:px-6 md:pb-12 lg:grid-cols-3">
           {clips.map((clip) => (
             <article
               key={clip.performance.id}
-              className="flex min-h-full snap-start items-center py-3"
+              className="flex min-h-full snap-start items-center py-3 md:min-h-0 md:py-0"
             >
               <PerformanceCard
                 performance={clip.performance}

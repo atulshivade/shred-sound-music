@@ -384,7 +384,7 @@ test.describe("Admin sees recent student submissions", () => {
     await studentPage.getByLabel(/title/i).fill(uniqueTitle);
     await studentPage.getByRole("button", { name: /submit/i }).click();
     await expect(
-      studentPage.getByText(/Performance posted to the gallery/i),
+      studentPage.getByText(/Performance submitted for teacher approval/i),
     ).toBeVisible({ timeout: 15_000 });
     await studentCtx.close();
 
@@ -696,7 +696,7 @@ test.describe("Student → Cloudinary file upload → Teacher dashboard", () => 
     // Toast must say success — if Zod rejects the payload we see an error
     // toast instead (which was the silent bug).
     await expect(
-      studentPage.getByText(/Performance posted to the gallery/i),
+      studentPage.getByText(/Performance submitted for teacher approval/i),
     ).toBeVisible({ timeout: 30_000 });
     // The error path used to look like this — assert we never see it.
     await expect(

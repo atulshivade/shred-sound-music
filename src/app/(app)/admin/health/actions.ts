@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { testRuns } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/queries";
 import {
   dispatchFullTestRun,
   executeSmokeRun,
@@ -43,6 +44,9 @@ export async function runSmokeTestsAction(): Promise<TestAgentActionResult> {
     }
     const run = await createRun("SMOKE", session.user.id);
     const summary = await executeSmokeRun(run.id, session.user.id);
+    // A run either raises or clears the service notice, so the cached
+    // banner lookup must be refreshed before the next page render.
+    revalidateTag(CACHE_TAGS.serviceNotices, "max");
     revalidatePath("/admin/health");
     return {
       ok: true,

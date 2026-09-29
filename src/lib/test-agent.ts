@@ -6,6 +6,11 @@ import {
   testRuns,
   type TestCaseResult,
 } from "@/db/schema";
+import {
+  describePlacement,
+  getRuntimePlacement,
+  suggestedFunctionRegion,
+} from "@/lib/runtime-placement";
 
 type ProbeResult = {
   slug: string;
@@ -17,6 +22,22 @@ type ProbeResult = {
 };
 
 const TERMINAL_STATUSES = ["PASSED", "FAILED", "TIMED_OUT"] as const;
+
+/**
+ * Latency budgets, in milliseconds. These are deliberately generous: they
+ * exist to catch the structural regressions that make the app feel broken
+ * (a database on another continent, a cold start replaying migrations),
+ * not to police normal variance.
+ */
+const BUDGETS = {
+  /** Median of several `select 1` round trips from the server to the DB. */
+  dbRoundTrip: () => Number(process.env.PERF_BUDGET_DB_MS ?? 120),
+  /** Time to first byte for a server-rendered page. */
+  pageTtfb: () => Number(process.env.PERF_BUDGET_PAGE_MS ?? 2_000),
+} as const;
+
+/** Probe slugs whose failure means the app is unusable, not merely slow. */
+const CRITICAL_SLUGS = ["smoke.db.ping", "smoke.api.session"];
 
 function redact(value: unknown): string {
   let text = value instanceof Error ? value.stack ?? value.message : String(value);
@@ -73,28 +94,177 @@ async function httpProbe(
   }
 }
 
-async function runSmokeProbes(baseUrl: string): Promise<ProbeResult[]> {
-  const dbStarted = Date.now();
-  let dbResult: ProbeResult;
-  try {
+/**
+ * Measures the server-to-database round trip. The first call is discarded
+ * because it also pays for opening the connection; what we want to know is
+ * the steady-state cost of a query, which is the number that gets multiplied
+ * by every query on every page.
+ */
+async function measureDbRoundTrip(): Promise<number[]> {
+  const samples: number[] = [];
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const started = Date.now();
     await db.execute(sql`select 1`);
-    dbResult = {
-      slug: "smoke.db.ping",
-      title: "Database connectivity",
+    if (attempt > 0) samples.push(Date.now() - started);
+  }
+  return samples.sort((a, b) => a - b);
+}
+
+/**
+ * Connectivity and latency are reported as two separate checks on purpose.
+ * An unreachable database means the app is down and everyone should be told;
+ * a reachable but slow one means the app still works, so only teachers see
+ * it. Folding them together would show students an outage banner whenever
+ * the database was merely sluggish.
+ */
+async function probeDatabase(): Promise<ProbeResult[]> {
+  const started = Date.now();
+  let samples: number[];
+  try {
+    samples = await measureDbRoundTrip();
+  } catch (error) {
+    return [
+      {
+        slug: "smoke.db.ping",
+        title: "Database connectivity",
+        ok: false,
+        durationMs: Date.now() - started,
+        publicSummary: "The service is temporarily unavailable",
+        adminDetail: redact(error),
+      },
+    ];
+  }
+
+  const median = samples[Math.floor(samples.length / 2)] ?? 0;
+  const budget = BUDGETS.dbRoundTrip();
+  const placement = getRuntimePlacement();
+  const connectivity: ProbeResult = {
+    slug: "smoke.db.ping",
+    title: "Database connectivity",
+    ok: true,
+    durationMs: median,
+    publicSummary: "Check passed",
+    adminDetail: `Median query round trip ${median}ms. ${describePlacement(placement)}`,
+  };
+
+  const latency: ProbeResult =
+    median > budget
+      ? {
+          slug: "perf.db.latency",
+          title: "Database response time",
+          ok: false,
+          durationMs: median,
+          publicSummary: "The service is responding slowly",
+          adminDetail: [
+            `Median query round trip ${median}ms exceeds the ${budget}ms budget (samples: ${samples.join(", ")}ms).`,
+            describePlacement(placement),
+            placement.isCrossRegion
+              ? "The server and the database are in different regions, which is the usual cause."
+              : "Check whether the database instance is suspended or under-provisioned.",
+          ].join(" "),
+        }
+      : {
+          slug: "perf.db.latency",
+          title: "Database response time",
+          ok: true,
+          durationMs: median,
+          publicSummary: "Check passed",
+          adminDetail: `Median query round trip ${median}ms (budget ${budget}ms).`,
+        };
+
+  return [connectivity, latency];
+}
+
+/**
+ * Reports where the server runs relative to the database, and fails when
+ * they are on different continents. Nothing errors in that configuration —
+ * the app is just slow on every request — so without an explicit check it
+ * goes unnoticed.
+ */
+function probeRuntimePlacement(): ProbeResult {
+  const placement = getRuntimePlacement();
+  if (!placement.isCrossRegion) {
+    return {
+      slug: "perf.runtime.placement",
+      title: "Server and database placement",
       ok: true,
-      durationMs: Date.now() - dbStarted,
+      durationMs: 0,
       publicSummary: "Check passed",
+      adminDetail: describePlacement(placement),
+    };
+  }
+  const suggestion = suggestedFunctionRegion(placement);
+  return {
+    slug: "perf.runtime.placement",
+    title: "Server and database placement",
+    ok: false,
+    durationMs: 0,
+    publicSummary: "The service is responding slowly",
+    adminDetail: [
+      describePlacement(placement),
+      "Every database query crosses regions, which adds latency to every request.",
+      suggestion
+        ? `Set "regions": ["${suggestion}"] in vercel.json and redeploy, or move the database to ${placement.functionCloudRegion}.`
+        : "Move the deployment and the database into the same region.",
+    ].join(" "),
+  };
+}
+
+/** Time to first byte for a server-rendered page, against its budget. */
+async function probePageLatency(
+  baseUrl: string,
+  slug: string,
+  title: string,
+  path: string,
+): Promise<ProbeResult> {
+  const started = Date.now();
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(
+        Number(process.env.TEST_AGENT_SMOKE_TIMEOUT_MS ?? 30_000),
+      ),
+    });
+    const durationMs = Date.now() - started;
+    // A redirect is a valid, fast answer — this probe measures latency, not
+    // authorisation, which the functional probes already cover.
+    if (response.status >= 500) {
+      throw new Error(`Expected a successful response, received ${response.status}`);
+    }
+    const budget = BUDGETS.pageTtfb();
+    if (durationMs > budget) {
+      return {
+        slug,
+        title,
+        ok: false,
+        durationMs,
+        publicSummary: "The service is responding slowly",
+        adminDetail: `Responded in ${durationMs}ms, over the ${budget}ms budget.`,
+      };
+    }
+    return {
+      slug,
+      title,
+      ok: true,
+      durationMs,
+      publicSummary: "Check passed",
+      adminDetail: `Responded in ${durationMs}ms (budget ${budget}ms).`,
     };
   } catch (error) {
-    dbResult = {
-      slug: "smoke.db.ping",
-      title: "Database connectivity",
+    return {
+      slug,
+      title,
       ok: false,
-      durationMs: Date.now() - dbStarted,
-      publicSummary: "The service is temporarily unavailable",
+      durationMs: Date.now() - started,
+      publicSummary: "A service check failed",
       adminDetail: redact(error),
     };
   }
+}
+
+async function runSmokeProbes(baseUrl: string): Promise<ProbeResult[]> {
+  const dbResults = await probeDatabase();
 
   const httpResults = await Promise.all([
     httpProbe(baseUrl, "smoke.page.home", "Public home page", "/", (r) => {
@@ -137,8 +307,16 @@ async function runSmokeProbes(baseUrl: string): Promise<ProbeResult[]> {
         if (r.status !== 401) throw new Error(`Expected 401, received ${r.status}`);
       },
     ),
+    probePageLatency(baseUrl, "perf.page.home", "Home page response time", "/"),
+    probePageLatency(baseUrl, "perf.page.feed", "Feed response time", "/feed"),
+    probePageLatency(
+      baseUrl,
+      "perf.page.challenges",
+      "Challenges response time",
+      "/challenges",
+    ),
   ]);
-  return [dbResult, ...httpResults];
+  return [...dbResults, probeRuntimePlacement(), ...httpResults];
 }
 
 export async function executeSmokeRun(runId: string, adminId: string) {
@@ -176,9 +354,7 @@ export async function executeSmokeRun(runId: string, adminId: string) {
     .where(eq(testRuns.id, runId));
 
   if (failed.length) {
-    const critical = failed.some((item) =>
-      ["smoke.db.ping", "smoke.api.session"].includes(item.slug),
-    );
+    const critical = failed.some((item) => CRITICAL_SLUGS.includes(item.slug));
     await db.insert(serviceNotices).values({
       runId,
       createdById: adminId,

@@ -1,14 +1,10 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Crown, Music2, Sparkles, Filter } from "lucide-react";
 import { db } from "@/db";
-import {
-  performances,
-  performanceLikes,
-  users,
-  challenges,
-} from "@/db/schema";
+import { performanceLikes } from "@/db/schema";
 import type { Instrument, SkillLevel } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { getPublishedPerformances } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { PerformanceCard } from "@/components/performance-card";
 import { InstrumentIcon } from "@/components/instrument-icon";
@@ -38,23 +34,16 @@ export default async function FeedPage({
       ? (skillParam as SkillLevel)
       : null;
 
-  const baseSelect = db
-    .select({
-      performance: performances,
-      student: { id: users.id, name: users.name, image: users.image },
-      challenge: { id: challenges.id, title: challenges.title },
-    })
-    .from(performances)
-    .innerJoin(users, eq(performances.studentId, users.id))
-    .innerJoin(challenges, eq(performances.challengeId, challenges.id));
+  // The published list is identical for every viewer, so it comes from the
+  // shared cache; the session is independent of it and resolves in parallel.
+  const [published, session] = await Promise.all([
+    getPublishedPerformances(),
+    auth(),
+  ]);
 
-  // Pull all PUBLISHED performances; do filtering in JS (small dataset, easy
-  // to combine multiple optional filters without conditional `where` builders).
-  const all = (
-    await baseSelect
-      .where(eq(performances.status, "PUBLISHED"))
-      .orderBy(desc(performances.submittedAt))
-  ).filter(
+  // Filter in JS (small dataset, easy to combine multiple optional filters
+  // without conditional `where` builders).
+  const all = published.filter(
     (r) =>
       (!instrumentFilter || r.performance.instrument === instrumentFilter) &&
       (!skillFilter || r.performance.skillLevel === skillFilter),
@@ -65,7 +54,6 @@ export default async function FeedPage({
 
   // Pre-compute which performances the viewer has already liked so the
   // <LikeButton> renders in the correct initial state without extra round-trips.
-  const session = await auth();
   const viewerId = session?.user?.id;
   const visibleIds = all.map((r) => r.performance.id);
   const likedSet = new Set<string>();

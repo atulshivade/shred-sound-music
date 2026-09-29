@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -19,6 +19,7 @@ import {
   setPerformanceStatusSchema,
 } from "@/lib/validators";
 import { classifyActionFailure } from "@/lib/action-errors";
+import { CACHE_TAGS } from "@/lib/queries";
 
 export type ActionResult =
   | { ok: true }
@@ -99,6 +100,7 @@ export async function togglePerformanceLikeAction(
         .where(eq(performances.id, performanceId))
         .returning({ likesCount: performances.likesCount });
 
+      revalidateTag(CACHE_TAGS.performances, "max");
       revalidatePath("/feed");
       revalidatePath(`/challenges/${perf.challengeId}`);
       return { ok: true, liked: false, likesCount: updated?.likesCount ?? 0 };
@@ -114,6 +116,7 @@ export async function togglePerformanceLikeAction(
       .where(eq(performances.id, performanceId))
       .returning({ likesCount: performances.likesCount });
 
+    revalidateTag(CACHE_TAGS.performances, "max");
     revalidatePath("/feed");
     revalidatePath(`/challenges/${perf.challengeId}`);
     return { ok: true, liked: true, likesCount: updated?.likesCount ?? 1 };
@@ -170,6 +173,7 @@ export async function createPerformanceAction(
       status: "PENDING",
     });
 
+    revalidateTag(CACHE_TAGS.performances, "max");
     revalidatePath(`/challenges/${parsed.data.challengeId}`);
     revalidatePath("/feed");
     // Teachers expect the dashboard + evaluation studio to update the moment
@@ -289,6 +293,7 @@ export async function togglePerformanceFlagAction(
         .where(eq(topPerformers.performanceId, current.id));
     }
 
+    revalidateTag(CACHE_TAGS.performances, "max");
     revalidatePath("/admin/evaluate");
     revalidatePath(`/challenges/${current.challengeId}`);
     revalidatePath("/feed");
@@ -318,6 +323,7 @@ export async function setPerformanceStatusAction(
       .set({ status: parsed.data.status })
       .where(eq(performances.id, parsed.data.performanceId));
 
+    revalidateTag(CACHE_TAGS.performances, "max");
     revalidatePath("/admin/evaluate");
     revalidatePath(`/challenges/${current.challengeId}`);
     revalidatePath("/feed");

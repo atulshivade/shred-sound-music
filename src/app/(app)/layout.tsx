@@ -25,6 +25,9 @@ export default async function AppShellLayout({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
+      {/* Not wrapped in Suspense on purpose: the notice lookup is a cached
+          read, so a boundary here would buy no latency while adding a
+          streaming seam around the navigation's hydration. */}
       <ServiceNoticeBanner role={session.user.role} />
       <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
