@@ -1,7 +1,72 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
+import { Play } from "lucide-react";
 import type { VideoProvider } from "@/db/schema";
+
+const YOUTUBE_EMBED_ID = /youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/;
+
+function withAutoplay(url: string): string {
+  return `${url}${url.includes("?") ? "&" : "?"}autoplay=1`;
+}
+
+/**
+ * A third-party player costs roughly a megabyte of script per instance, so
+ * feeds show a thumbnail and only mount the iframe once the viewer asks.
+ */
+function EmbedFacade({
+  url,
+  poster,
+  className,
+}: {
+  url: string;
+  poster?: string | null;
+  className?: string;
+}) {
+  const [active, setActive] = useState(false);
+  const frameClass = className ?? "aspect-video w-full bg-black";
+
+  if (active) {
+    return (
+      <iframe
+        src={withAutoplay(url)}
+        className={frameClass}
+        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+        allowFullScreen
+        title="Performance video"
+      />
+    );
+  }
+
+  const youtubeId = url.match(YOUTUBE_EMBED_ID)?.[1];
+  const thumbnail =
+    poster ?? (youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : null);
+
+  return (
+    <button
+      type="button"
+      onClick={() => setActive(true)}
+      aria-label="Play video"
+      className={`group relative grid place-items-center overflow-hidden ${frameClass}`}
+    >
+      {thumbnail ? (
+        // eslint-disable-next-line @next/next/no-img-element -- remote thumbnail hosts vary per provider
+        <img
+          src={thumbnail}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <span className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-black" />
+      )}
+      <span className="relative grid h-14 w-14 place-items-center rounded-full bg-black/60 text-white shadow-lg transition-transform group-hover:scale-110">
+        <Play className="ml-1 h-7 w-7 fill-current" />
+      </span>
+    </button>
+  );
+}
 
 type Props = {
   provider: VideoProvider;
@@ -37,18 +102,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, Props>(
     ref,
   ) {
     if (provider === "VIMEO" || provider === "EMBED") {
-      return (
-        <iframe
-          src={url}
-          className={
-            className ?? "aspect-video w-full bg-black"
-          }
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-          allowFullScreen
-          loading="lazy"
-          title="Performance video"
-        />
-      );
+      return <EmbedFacade url={url} poster={poster} className={className} />;
     }
 
     return (
@@ -61,7 +115,8 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, Props>(
         loop={loop}
         muted={muted}
         playsInline={playsInline}
-        preload="metadata"
+        // With a poster there is nothing to show before play, so fetch nothing.
+        preload={poster ? "none" : "metadata"}
         className={className ?? "aspect-video w-full bg-black"}
       />
     );
