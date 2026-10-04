@@ -55,6 +55,11 @@ function redact(value: unknown): string {
 export function getTestBaseUrl(): string {
   const configured = process.env.TEST_BASE_URL || process.env.AUTH_URL;
   if (configured) return configured.replace(/\/$/, "");
+  // VERCEL_URL is the per-deployment host, which sits behind Vercel's
+  // deployment protection and answers every probe with a login page.
+  if (process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
 }

@@ -330,19 +330,12 @@ FILE tab comes back automatically.
    site with Cloudflare DNS, set the proxy status to **DNS only** (grey
    cloud) so Vercel can complete its certificate challenge.
 
-6. (Optional, recommended) Align the Vercel function region with the
-   Neon region you picked in step 1 to cut DB latency. **Settings →
-   Functions → Region** (or add `"regions": ["fra1"]` to `vercel.json`
-   for Europe, `"bom1"` for Mumbai, `"iad1"` for US East). The repo's
-   `vercel.json` deliberately omits the pin so the default matches your
-   Neon project location.
-
-6. (Optional, recommended) Align the Vercel function region with the
-   Neon region you picked in step 1 to cut DB latency. In Vercel:
-   **Settings → Functions → Region** (or add `"regions": ["fra1"]` to
-   `vercel.json` for Europe, `"bom1"` for Mumbai, `"iad1"` for US East,
-   etc.). The repo's `vercel.json` deliberately omits the pin so the
-   default matches your Neon project location.
+6. Keep the Vercel function region next to the Neon region you picked in
+   step 1. `vercel.json` pins `"regions": ["sin1"]` to match a Neon
+   project in `ap-southeast-1`; change it (`"fra1"` for Frankfurt,
+   `"bom1"` for Mumbai, `"iad1"` for US East) if your database lives
+   elsewhere. Every query crosses the gap, and the Test Agent's
+   "Server and database placement" check fails when they differ.
 
 ### Cloudinary credentials — two equivalent formats
 
