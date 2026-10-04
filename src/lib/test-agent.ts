@@ -37,7 +37,7 @@ const BUDGETS = {
 } as const;
 
 /** Probe slugs whose failure means the app is unusable, not merely slow. */
-const CRITICAL_SLUGS = ["smoke.db.ping", "smoke.api.session"];
+const CRITICAL_SLUGS = ["smoke.db.ping", "smoke.db.schema", "smoke.api.session"];
 
 function redact(value: unknown): string {
   let text = value instanceof Error ? value.stack ?? value.message : String(value);
@@ -176,6 +176,41 @@ async function probeDatabase(): Promise<ProbeResult[]> {
 }
 
 /**
+ * Verifies the database carries the schema this deploy expects. The cold
+ * start bootstrap only logs its failures, so a deploy that adds tables can
+ * leave every page that reads them broken with nothing visible to a teacher.
+ * When the fingerprint is stale this re-applies the bootstrap, which both
+ * repairs the database and surfaces the exact SQL error if it still fails.
+ */
+async function probeSchema(): Promise<ProbeResult> {
+  const started = Date.now();
+  const base = { slug: "smoke.db.schema", title: "Database schema is current" };
+  try {
+    const { ensureSchemaBootstrap, SCHEMA_FINGERPRINT } = await import(
+      "@/db/schema-bootstrap"
+    );
+    const { applied, statements } = await ensureSchemaBootstrap(db);
+    return {
+      ...base,
+      ok: true,
+      durationMs: Date.now() - started,
+      publicSummary: "Check passed",
+      adminDetail: applied
+        ? `Schema was out of date; re-applied ${statements} statements (fingerprint ${SCHEMA_FINGERPRINT}).`
+        : `Schema fingerprint ${SCHEMA_FINGERPRINT} matches.`,
+    };
+  } catch (error) {
+    return {
+      ...base,
+      ok: false,
+      durationMs: Date.now() - started,
+      publicSummary: "The service is temporarily unavailable",
+      adminDetail: redact(error),
+    };
+  }
+}
+
+/**
  * Reports where the server runs relative to the database, and fails when
  * they are on different continents. Nothing errors in that configuration —
  * the app is just slow on every request — so without an explicit check it
@@ -265,6 +300,7 @@ async function probePageLatency(
 
 async function runSmokeProbes(baseUrl: string): Promise<ProbeResult[]> {
   const dbResults = await probeDatabase();
+  if (dbResults[0]?.ok) dbResults.push(await probeSchema());
 
   const httpResults = await Promise.all([
     httpProbe(baseUrl, "smoke.page.home", "Public home page", "/", (r) => {
