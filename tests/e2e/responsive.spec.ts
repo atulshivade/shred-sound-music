@@ -112,7 +112,7 @@ test.describe("Responsive landing page", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await signIn(page, STUDENT_ALEX);
     await page.goto("/feed");
-    const nav = page.getByRole("navigation", { name: /mobile primary/i });
+    const nav = page.getByRole("navigation", { name: /^primary$/i });
     await expect(nav).toBeVisible();
     for (const label of ["Home", "Shorts", "Challenges", "Learn", "Profile"]) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
@@ -123,6 +123,6 @@ test.describe("Responsive landing page", () => {
     // direct navigation still validates the route without testing that overlay.
     await page.goto("/shorts");
     await expect(page).toHaveURL(/\/shorts$/);
-    await expect(page.getByRole("heading", { name: /shred shorts/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^🎬 shorts$/i })).toBeVisible();
   });
 });

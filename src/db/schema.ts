@@ -327,6 +327,56 @@ export const performanceLikes = pgTable(
 );
 
 /**
+ * Clap and Shred reactions. Hearts stay in `performance_like` because the
+ * denormalised `likesCount` and existing rows depend on it.
+ */
+export const reactionKindEnum = pgEnum("reaction_kind", ["CLAP", "SHRED"]);
+
+export const performanceReactions = pgTable(
+  "performance_reaction",
+  {
+    performanceId: uuid("performance_id")
+      .notNull()
+      .references(() => performances.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: reactionKindEnum("kind").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.performanceId, t.userId, t.kind] }),
+    index("performance_reaction_performance_idx").on(t.performanceId),
+  ],
+);
+
+/**
+ * Ledger of XP awards. `sourceKey` identifies what earned the XP (for
+ * example `quiz:guess-1:2026-10-04`), and the unique index makes every award
+ * claimable once, so replaying a request cannot inflate `users.points`.
+ */
+export const xpEvents = pgTable(
+  "xp_event",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sourceKey: text("source_key").notNull(),
+    amount: integer("amount").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("xp_event_user_source_unique").on(t.userId, t.sourceKey),
+    index("xp_event_user_idx").on(t.userId),
+  ],
+);
+
+/**
  * Persisted executions from the admin Test Agent. SMOKE runs execute safe
  * in-process diagnostics; FULL_E2E/RETEST runs are delegated to CI.
  */
@@ -500,3 +550,4 @@ export type Instrument = (typeof instrumentEnum.enumValues)[number];
 export type SkillLevel = (typeof skillLevelEnum.enumValues)[number];
 export type VideoProvider = (typeof videoProviderEnum.enumValues)[number];
 export type PerformanceStatus = (typeof performanceStatusEnum.enumValues)[number];
+export type ReactionKind = (typeof reactionKindEnum.enumValues)[number];

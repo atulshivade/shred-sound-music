@@ -89,11 +89,10 @@ challenge-portal/
     │   ├── page.tsx                         # public landing
     │   ├── globals.css                      # Tailwind v4 + dark music palette
     │   ├── (auth)/                          # sign-in / sign-up (with instrument + skill profile fields)
-    │   ├── (app)/                           # protected app shell with navbar
-    │   │   ├── challenges/page.tsx          # active challenges grid
-    │   │   ├── challenges/[id]/page.tsx     # detail + uploader + filterable performance gallery
-    │   │   ├── feed/page.tsx                # filterable feed + Best Performer spotlight
-    │   │   └── admin/                       # teacher dashboard, create-challenge, evaluation studio
+    │   ├── (app)/                           # protected area (auth gate only)
+    │   │   ├── (student)/                   # dark phone-style student app: tab bar + upload sheet
+    │   │   │   ├── feed/ shorts/ challenges/ learn/ profile/
+    │   │   └── admin/                       # teacher studio with its own navbar
     │   └── api/
     │       ├── auth/[...nextauth]/route.ts
     │       ├── upload/route.ts              # multipart image/video upload (raw)
@@ -102,9 +101,8 @@ challenge-portal/
     │   ├── ui/                              # shadcn primitives
     │   ├── navbar.tsx                       # role-aware top nav
     │   ├── nav-link.tsx
-    │   ├── challenge-card.tsx               # with instrument-focus badge
+    │   ├── student/                         # student app: bottom nav, upload sheet, feed/quiz/homework cards
     │   ├── performance-card.tsx             # video + Verified / Best Performer badges + duration
-    │   ├── performance-uploader.tsx         # tabbed file-upload OR YouTube/Vimeo embed
     │   ├── performance-admin-actions.tsx    # Verify / Crown / Publish / Reject / Add feedback
     │   ├── evaluate-row.tsx                 # threads video.currentTime → feedback dialog
     │   ├── video-player.tsx                 # <video> for files, <iframe> for embeds
@@ -201,15 +199,23 @@ everywhere instead of redefining shapes.
 - `/` — landing
 - `/sign-in`, `/sign-up`
 
-### Authenticated (any role)
-- `/challenges` — active challenges grid (with instrument-focus badges)
-- `/challenges/[id]` — detail + your performance uploader + filterable
-  gallery + Best Performer highlight
-- `/feed` — filterable feed by instrument / skill, with Best Performer
-  spotlight at the top
-- `/shorts` — mobile-first vertical approved-performance feed
-- `/learn` — homework, lesson, song and quiz foundation
-- `/profile` — XP and personal submission status
+### Student app (any signed-in role)
+A dark, phone-first app shell (`src/app/(app)/(student)`) with an emoji tab
+bar and a floating ＋ button that opens the "Upload Your Shred" sheet. Every
+upload is submitted for teacher approval before anyone else can see it.
+- `/feed` — streak banner plus approved videos mixed with a teacher
+  challenge, an achievement, the daily "Guess This Song" quiz and Student of
+  the Week; ❤️ 👏 🔥 reactions and share
+- `/shorts` — full-height approved videos with category chips
+- `/challenges` — active challenges with your status, the 7-day practice
+  tracker and completed challenges; `/challenges/[id]` for details
+- `/learn` — homework (log practice, submit a take), songs, lesson videos
+  and quizzes
+- `/profile` — level, XP, stats, collectible badges, achievements and a
+  share button (no contact details are ever shown)
+
+XP, levels, streaks and badges are derived in `src/lib/gamification.ts` from
+real activity (`xp_event`, `performance_reaction`, approved performances).
 
 ### Teacher (admin) only
 - `/admin` — studio dashboard

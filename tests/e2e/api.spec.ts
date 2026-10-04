@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { test, expect, signIn, STUDENT_ALEX, TEACHER } from "./fixtures";
+import {
+  test,
+  expect,
+  signIn,
+  openUploadSheet,
+  STUDENT_ALEX,
+  TEACHER,
+} from "./fixtures";
 import {
   parseCloudinaryUrl,
   buildCloudinarySignedParams,
@@ -363,26 +370,18 @@ test.describe("Admin sees recent student submissions", () => {
     await signIn(studentPage, STUDENT_ALEX);
 
     await studentPage.goto("/challenges");
-    const firstChallengeLink = studentPage
-      .locator("a[href^='/challenges/']")
-      .first();
-    await firstChallengeLink.click();
-    // Generous timeout: on a cold Turbopack dev server the first compile
-    // of `/challenges/[id]` can take ~15 s by itself, which used to leave
-    // `waitForURL` racing the compiler. 60 s gives the compiler enough
-    // headroom in CI / corporate-proxy environments without masking real
-    // regressions (the next page interaction has its own assertion).
-    await studentPage.waitForURL(/\/challenges\/[^/]+/, { timeout: 60_000 });
-
-    await studentPage
-      .getByRole("tab", { name: /paste link/i })
-      .click()
-      .catch(() => undefined);
-    await studentPage
-      .getByLabel(/youtube or vimeo url/i)
-      .fill("https://youtu.be/dQw4w9WgXcQ");
-    await studentPage.getByLabel(/title/i).fill(uniqueTitle);
-    await studentPage.getByRole("button", { name: /submit/i }).click();
+    const sheet = await openUploadSheet(studentPage);
+    const link = sheet.getByLabel(/youtube or vimeo link/i);
+    if (!(await link.isVisible())) {
+      // Uploads-enabled deploys open on the file picker; switch to a link.
+      await sheet
+        .getByRole("button", { name: /paste a youtube link/i })
+        .click({ timeout: 5_000 })
+        .catch(() => undefined);
+    }
+    await link.fill("https://youtu.be/dQw4w9WgXcQ");
+    await sheet.getByLabel(/song name/i).fill(uniqueTitle);
+    await sheet.getByRole("button", { name: /submit for approval/i }).click();
     await expect(
       studentPage.getByText(/Performance submitted for teacher approval/i),
     ).toBeVisible({ timeout: 15_000 });
@@ -672,26 +671,17 @@ test.describe("Student → Cloudinary file upload → Teacher dashboard", () => 
     await signIn(studentPage, STUDENT_ALEX);
 
     await studentPage.goto("/challenges");
-    await studentPage
-      .locator("a[href^='/challenges/']")
-      .first()
-      .click();
-    // Cold Turbopack compile of `/challenges/[id]` can take ~15 s. The
-    // upload phase after this also has its own timeout, so a generous
-    // routing window here just absorbs first-compile latency without
-    // masking the actual upload assertions.
-    await studentPage.waitForURL(/\/challenges\/[^/]+/, { timeout: 60_000 });
+    const sheet = await openUploadSheet(studentPage);
 
-    // Stay on the FILE tab (default when uploads are enabled). Attach the
-    // tiny mp4 fixture so the browser-direct path
+    // Attach the tiny mp4 fixture so the browser-direct path
     //   /api/upload/sign → POST to api.cloudinary.com → createPerformanceAction
     // runs. This sidesteps Vercel's 4.5 MB function body cap, which used
     // to 413 every >4.5 MB file before the direct-upload refactor.
-    await studentPage
-      .getByLabel(/performance video/i)
+    await sheet
+      .getByLabel(/tap to select video/i)
       .setInputFiles(path.resolve(process.cwd(), "tests/fixtures/probe.mp4"));
-    await studentPage.getByLabel(/title/i).fill(uniqueTitle);
-    await studentPage.getByRole("button", { name: /submit/i }).click();
+    await sheet.getByLabel(/song name/i).fill(uniqueTitle);
+    await sheet.getByRole("button", { name: /submit for approval/i }).click();
 
     // Toast must say success — if Zod rejects the payload we see an error
     // toast instead (which was the silent bug).

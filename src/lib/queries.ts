@@ -19,7 +19,8 @@ import {
  * serverless host those round trips dominate the response. Wrapping the
  * queries in the data cache means one visitor warms the rows for everyone,
  * while the tags keep writes authoritative: any mutation that changes these
- * rows calls `revalidateTag` and the next read goes back to the database.
+ * rows calls `updateTag` (server actions) or `revalidateTag` (route
+ * handlers) and the next read goes back to the database.
  *
  * Anything viewer-specific (likes, profile, admin evaluation queues) stays
  * uncached and is queried directly by the page.
@@ -50,7 +51,12 @@ export const getPublishedPerformances = unstable_cache(
     db
       .select({
         performance: performances,
-        student: { id: users.id, name: users.name, image: users.image },
+        student: {
+          id: users.id,
+          name: users.name,
+          image: users.image,
+          points: users.points,
+        },
         challenge: { id: challenges.id, title: challenges.title },
       })
       .from(performances)

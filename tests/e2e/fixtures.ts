@@ -33,6 +33,14 @@ export async function signIn(
   await page.waitForURL(/\/(challenges|admin)/, { timeout: 30_000 });
 }
 
+/** Open the student "Upload Your Shred" sheet from the floating ＋ button. */
+export async function openUploadSheet(page: Page) {
+  await page.getByRole("button", { name: /upload your shred/i }).click();
+  const sheet = page.getByRole("dialog", { name: /upload your shred/i });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
 /**
  * Helper: capture all browser console errors during a test. Returns a getter
  * the test can call after navigation to assert nothing went wrong.

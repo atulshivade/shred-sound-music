@@ -205,6 +205,7 @@ test.describe("Cached read models are invalidated by their writers", () => {
       "createPerformanceAction",
       "togglePerformanceFlagAction",
       "setPerformanceStatusAction",
+      "toggleReactionAction",
     ];
     for (const writer of writers) {
       const body = source.slice(source.indexOf(`export async function ${writer}`));
@@ -213,19 +214,22 @@ test.describe("Cached read models are invalidated by their writers", () => {
       expect(
         scoped,
         `${writer} writes performances but never purges the cache tag`,
-      ).toContain("revalidateTag(CACHE_TAGS.performances");
+      ).toContain("updateTag(CACHE_TAGS.performances)");
     }
+    // Server actions must read their own writes: `revalidateTag(…, "max")`
+    // is stale-while-revalidate and would show the old rows on reload.
+    expect(source).not.toContain("revalidateTag(");
   });
 
   test("creating a challenge purges the challenges tag", () => {
     expect(
       sourceFor("src/app/(app)/admin/challenges/new/actions.ts"),
-    ).toContain("revalidateTag(CACHE_TAGS.challenges");
+    ).toContain("updateTag(CACHE_TAGS.challenges)");
   });
 
   test("test runs purge the service-notice tag when they raise a notice", () => {
     expect(sourceFor("src/app/(app)/admin/health/actions.ts")).toContain(
-      "revalidateTag(CACHE_TAGS.serviceNotices",
+      "updateTag(CACHE_TAGS.serviceNotices)",
     );
     expect(
       sourceFor("src/app/api/internal/test-runs/ingest/route.ts"),

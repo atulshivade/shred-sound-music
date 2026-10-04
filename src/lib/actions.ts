@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -10,7 +10,12 @@ import {
   topPerformers,
   challenges,
   users,
+  performanceReactions,
+  xpEvents,
+  type ReactionKind,
 } from "@/db/schema";
+import { XP_REWARDS } from "@/lib/gamification";
+import { findHomework, findQuiz } from "@/lib/learn-content";
 import { auth, requireAdmin } from "@/lib/auth";
 import {
   createPerformanceSchema,
@@ -100,7 +105,7 @@ export async function togglePerformanceLikeAction(
         .where(eq(performances.id, performanceId))
         .returning({ likesCount: performances.likesCount });
 
-      revalidateTag(CACHE_TAGS.performances, "max");
+      updateTag(CACHE_TAGS.performances);
       revalidatePath("/feed");
       revalidatePath(`/challenges/${perf.challengeId}`);
       return { ok: true, liked: false, likesCount: updated?.likesCount ?? 0 };
@@ -116,12 +121,153 @@ export async function togglePerformanceLikeAction(
       .where(eq(performances.id, performanceId))
       .returning({ likesCount: performances.likesCount });
 
-    revalidateTag(CACHE_TAGS.performances, "max");
+    updateTag(CACHE_TAGS.performances);
     revalidatePath("/feed");
     revalidatePath(`/challenges/${perf.challengeId}`);
     return { ok: true, liked: true, likesCount: updated?.likesCount ?? 1 };
   } catch (err) {
     return describeActionError(err, "togglePerformanceLike");
+  }
+}
+
+/* --------------------------- Reactions --------------------------- */
+
+export async function toggleReactionAction(
+  performanceId: string,
+  kind: ReactionKind,
+): Promise<
+  | { ok: true; active: boolean; count: number }
+  | { ok: false; error: string }
+> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: "Sign in to react" };
+    if (kind !== "CLAP" && kind !== "SHRED") {
+      return { ok: false, error: "Unknown reaction" };
+    }
+    if (typeof performanceId !== "string" || performanceId.length < 8) {
+      return { ok: false, error: "Invalid performance" };
+    }
+    const [perf] = await db
+      .select({ status: performances.status })
+      .from(performances)
+      .where(eq(performances.id, performanceId))
+      .limit(1);
+    if (!perf) return { ok: false, error: "Performance not found" };
+    if (perf.status !== "PUBLISHED") {
+      return { ok: false, error: "Only approved videos can get reactions" };
+    }
+
+    const match = and(
+      eq(performanceReactions.performanceId, performanceId),
+      eq(performanceReactions.userId, session.user.id),
+      eq(performanceReactions.kind, kind),
+    );
+    const removed = await db
+      .delete(performanceReactions)
+      .where(match)
+      .returning({ kind: performanceReactions.kind });
+    if (removed.length === 0) {
+      await db
+        .insert(performanceReactions)
+        .values({ performanceId, userId: session.user.id, kind })
+        .onConflictDoNothing();
+    }
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(performanceReactions)
+      .where(
+        and(
+          eq(performanceReactions.performanceId, performanceId),
+          eq(performanceReactions.kind, kind),
+        ),
+      );
+
+    updateTag(CACHE_TAGS.performances);
+    return { ok: true, active: removed.length === 0, count: Number(count) };
+  } catch (err) {
+    return describeActionError(err, "toggleReaction");
+  }
+}
+
+/* --------------------------- XP: practice & quizzes --------------------------- */
+
+/**
+ * Record an XP event once per `sourceKey`. Returns false when the event was
+ * already recorded, so repeated clicks can never award XP twice.
+ */
+async function awardXp(userId: string, sourceKey: string, amount: number) {
+  const inserted = await db
+    .insert(xpEvents)
+    .values({ userId, sourceKey, amount })
+    .onConflictDoNothing()
+    .returning({ id: xpEvents.id });
+  if (inserted.length === 0) return false;
+  if (amount > 0) {
+    await db
+      .update(users)
+      .set({ points: sql`${users.points} + ${amount}` })
+      .where(eq(users.id, userId));
+  }
+  return true;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export async function logPracticeAction(
+  homeworkId: string,
+): Promise<{ ok: true; awarded: number } | { ok: false; error: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: "Sign in to log practice" };
+    if (!findHomework(homeworkId)) return { ok: false, error: "Unknown homework" };
+
+    const awarded = await awardXp(
+      session.user.id,
+      `homework:${homeworkId}:${todayKey()}`,
+      XP_REWARDS.practiceSession,
+    );
+    if (!awarded) {
+      return { ok: false, error: "Already logged today — come back tomorrow!" };
+    }
+    revalidatePath("/learn");
+    revalidatePath("/profile");
+    return { ok: true, awarded: XP_REWARDS.practiceSession };
+  } catch (err) {
+    return describeActionError(err, "logPractice");
+  }
+}
+
+export async function answerQuizAction(
+  quizId: string,
+  choice: string,
+): Promise<
+  | { ok: true; correct: boolean; answer: string; awarded: number }
+  | { ok: false; error: string }
+> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: "Sign in to play" };
+    const quiz = findQuiz(quizId);
+    if (!quiz || !quiz.options.includes(choice)) {
+      return { ok: false, error: "Unknown quiz answer" };
+    }
+    const correct = choice === quiz.answer;
+    const amount = correct ? XP_REWARDS.quizCorrect : 0;
+    const recorded = await awardXp(
+      session.user.id,
+      `quiz:${quizId}:${todayKey()}`,
+      amount,
+    );
+    if (!recorded) {
+      return { ok: false, error: "You already played today's quiz" };
+    }
+    revalidatePath("/profile");
+    return { ok: true, correct, answer: quiz.answer, awarded: amount };
+  } catch (err) {
+    return describeActionError(err, "answerQuiz");
   }
 }
 
@@ -173,7 +319,7 @@ export async function createPerformanceAction(
       status: "PENDING",
     });
 
-    revalidateTag(CACHE_TAGS.performances, "max");
+    updateTag(CACHE_TAGS.performances);
     revalidatePath(`/challenges/${parsed.data.challengeId}`);
     revalidatePath("/feed");
     // Teachers expect the dashboard + evaluation studio to update the moment
@@ -293,7 +439,7 @@ export async function togglePerformanceFlagAction(
         .where(eq(topPerformers.performanceId, current.id));
     }
 
-    revalidateTag(CACHE_TAGS.performances, "max");
+    updateTag(CACHE_TAGS.performances);
     revalidatePath("/admin/evaluate");
     revalidatePath(`/challenges/${current.challengeId}`);
     revalidatePath("/feed");
@@ -323,7 +469,7 @@ export async function setPerformanceStatusAction(
       .set({ status: parsed.data.status })
       .where(eq(performances.id, parsed.data.performanceId));
 
-    revalidateTag(CACHE_TAGS.performances, "max");
+    updateTag(CACHE_TAGS.performances);
     revalidatePath("/admin/evaluate");
     revalidatePath(`/challenges/${current.challengeId}`);
     revalidatePath("/feed");

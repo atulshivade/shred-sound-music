@@ -18,12 +18,14 @@ function EmbedFacade({
   url,
   poster,
   className,
+  startActive = false,
 }: {
   url: string;
   poster?: string | null;
   className?: string;
+  startActive?: boolean;
 }) {
-  const [active, setActive] = useState(false);
+  const [active, setActive] = useState(startActive);
   const frameClass = className ?? "aspect-video w-full bg-black";
 
   if (active) {
@@ -102,7 +104,14 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, Props>(
     ref,
   ) {
     if (provider === "VIMEO" || provider === "EMBED") {
-      return <EmbedFacade url={url} poster={poster} className={className} />;
+      return (
+        <EmbedFacade
+          url={url}
+          poster={poster}
+          className={className}
+          startActive={autoPlay}
+        />
+      );
     }
 
     return (

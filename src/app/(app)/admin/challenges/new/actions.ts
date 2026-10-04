@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { db } from "@/db";
 import { challenges } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
@@ -56,7 +56,7 @@ export async function createChallengeAction(
     };
   }
 
-  revalidateTag(CACHE_TAGS.challenges, "max");
+  updateTag(CACHE_TAGS.challenges);
   revalidatePath("/admin");
   revalidatePath("/challenges");
   redirect("/admin");

@@ -275,6 +275,37 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS "test_case_result_status_idx" ON "test_case_result" USING btree ("status")`,
   `CREATE INDEX IF NOT EXISTS "service_notice_active_idx" ON "service_notice" USING btree ("is_active","audience")`,
 
+  // Reactions and the XP ledger (migration 0003_gamification).
+  `DO $$ BEGIN
+     CREATE TYPE "public"."reaction_kind" AS ENUM('CLAP','SHRED');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `CREATE TABLE IF NOT EXISTS "performance_reaction" (
+     "performance_id" uuid NOT NULL,
+     "user_id" uuid NOT NULL,
+     "kind" "reaction_kind" NOT NULL,
+     "created_at" timestamp DEFAULT now() NOT NULL,
+     CONSTRAINT "performance_reaction_performance_id_user_id_kind_pk" PRIMARY KEY("performance_id","user_id","kind")
+   )`,
+  `CREATE TABLE IF NOT EXISTS "xp_event" (
+     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+     "user_id" uuid NOT NULL,
+     "source_key" text NOT NULL,
+     "amount" integer NOT NULL,
+     "created_at" timestamp DEFAULT now() NOT NULL
+   )`,
+  `DO $$ BEGIN
+     ALTER TABLE "performance_reaction" ADD CONSTRAINT "performance_reaction_performance_id_performance_id_fk" FOREIGN KEY ("performance_id") REFERENCES "public"."performance"("id") ON DELETE cascade;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     ALTER TABLE "performance_reaction" ADD CONSTRAINT "performance_reaction_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN
+     ALTER TABLE "xp_event" ADD CONSTRAINT "xp_event_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `CREATE INDEX IF NOT EXISTS "performance_reaction_performance_idx" ON "performance_reaction" USING btree ("performance_id")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "xp_event_user_source_unique" ON "xp_event" USING btree ("user_id","source_key")`,
+  `CREATE INDEX IF NOT EXISTS "xp_event_user_idx" ON "xp_event" USING btree ("user_id")`,
+
   // Bookkeeping table for the cold-start fast path. See `applySchemaBootstrap`.
   `CREATE TABLE IF NOT EXISTS "schema_state" (
      "key" text PRIMARY KEY NOT NULL,

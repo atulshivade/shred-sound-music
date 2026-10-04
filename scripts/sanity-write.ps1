@@ -80,25 +80,23 @@ $adminDetailHtml   = curl.exe -s -b $adminJar   "$BaseUrl/challenges/$challengeI
 $adminEvalHtml     = curl.exe -s -b $adminJar   "$BaseUrl/admin/evaluate"
 $feedHtml          = curl.exe -s -b $studentJar "$BaseUrl/feed"
 
-Check "Detail page shows 'Upload video' tab to student" ($studentDetailHtml -match 'Upload video')
-Check "Detail page shows instrument selector"          ($studentDetailHtml -match 'Instrument')
-Check "Detail page shows 'Skill level' selector"        ($studentDetailHtml -match 'Skill level')
-Check "Detail page hides uploader from teacher"        (-not ($adminDetailHtml -match 'Upload video'))
-Check "Detail page renders a performance card video"    ($adminDetailHtml -match '<iframe|<video')
+Check "Detail page offers 'Accept Challenge' to student" ($studentDetailHtml -match 'Accept Challenge|Submit Another Take|has closed')
+Check "Detail page hides the submit CTA from teacher"    (-not ($adminDetailHtml -match 'Accept Challenge|Submit Another Take'))
+Check "Detail page renders a playable video tile"       ($adminDetailHtml -match 'aria-label="Play video"')
 
 Check "/admin/evaluate exposes 'Verify' button"        ($adminEvalHtml -match 'Verify')
 Check "/admin/evaluate exposes 'Crown best' button"    ($adminEvalHtml -match 'Crown best|Best Performer')
 Check "/admin/evaluate exposes 'Add feedback' dialog"  ($adminEvalHtml -match 'Add feedback')
 
-Check "Feed surfaces Best Performer spotlight"         ($feedHtml -match 'Best Performer spotlight')
-Check "Feed exposes instrument filter chip"            ($feedHtml -match 'instrument=')
+Check "Feed surfaces a Best Performer"                 ($feedHtml -match 'Best Performer|Student of the Week')
+Check "Feed shows the daily quiz"                      ($feedHtml -match 'Guess This Song')
 
 # --- Like button rendering
 Write-Host ""
 Write-Host "=== Likes ===" -ForegroundColor Cyan
 $anonFeedHtml = curl.exe -s "$BaseUrl/sign-in"  # anon hits /feed → redirected, instead probe student-facing render
-Check "Student feed renders interactive like button" ($feedHtml -match 'aria-label="(Like|Unlike)"')
-Check "Detail page renders interactive like button"  ($studentDetailHtml -match 'aria-label="(Like|Unlike)"')
+Check "Student feed renders interactive heart button" ($feedHtml -match 'aria-label="Love it \(\d+\)"')
+Check "Detail page renders interactive heart button"  ($studentDetailHtml -match 'aria-label="Love it \(\d+\)"')
 Check "Admin evaluate renders like button"           ($adminEvalHtml -match 'aria-label="(Like|Unlike)"')
 
 Write-Host ""
