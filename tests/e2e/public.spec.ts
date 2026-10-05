@@ -175,3 +175,39 @@ test.describe("Public pages (no auth)", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Installable app", () => {
+  test("manifest launches standalone at the feed with real icons", async ({ request }) => {
+    const res = await request.get("/manifest.webmanifest");
+    expect(res.ok()).toBeTruthy();
+    const manifest = await res.json();
+    expect(manifest.display).toBe("standalone");
+    expect(manifest.start_url).toBe("/feed");
+    const sizes = manifest.icons.map((i: { sizes: string }) => i.sizes);
+    expect(sizes).toEqual(expect.arrayContaining(["192x192", "512x512"]));
+    for (const icon of [...manifest.icons, { src: "/icons/apple-touch-icon.png" }]) {
+      const png = await request.get(icon.src);
+      expect(png.ok(), icon.src).toBeTruthy();
+      expect(png.headers()["content-type"]).toContain("image/png");
+    }
+  });
+
+  test("/install is public and links the home-screen metadata", async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    await page.goto("/install");
+    await expect(page).toHaveURL(/\/install$/);
+    await expect(page.getByRole("heading", { name: /get the shred sound app/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /iphone or ipad/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /android/i })).toBeVisible();
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", /manifest/);
+    await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute(
+      "href",
+      /apple-touch-icon\.png/,
+    );
+    await expect(page.locator('meta[name="mobile-web-app-capable"]')).toHaveAttribute(
+      "content",
+      "yes",
+    );
+    expect(errors().filter((e) => !/preload|hydration/i.test(e))).toEqual([]);
+  });
+});

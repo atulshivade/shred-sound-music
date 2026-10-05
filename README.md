@@ -198,6 +198,7 @@ everywhere instead of redefining shapes.
 ### Public
 - `/` — landing
 - `/sign-in`, `/sign-up`
+- `/install` (public): add the app to an iPhone or Android home screen. Share this link to invite students.
 
 ### Student app (any signed-in role)
 A dark, phone-first app shell (`src/app/(app)/(student)`) with an emoji tab

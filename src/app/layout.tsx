@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Nunito } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -23,6 +23,21 @@ export const metadata: Metadata = {
   title: "Shred Sound Music — Performance & Challenge Portal",
   description:
     "Where students post their performances, teachers leave timestamped feedback, and the Shred Sound Music community discovers what's next.",
+  applicationName: "Shred Sound Music",
+  appleWebApp: {
+    capable: true,
+    title: "Shred Sound",
+    statusBarStyle: "black",
+  },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0b10",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
